@@ -45,6 +45,8 @@ HISTORY_KEEP_RECENT = 10
 THUMBNAIL_INTERVAL_SECONDS = 10
 MIN_STEPS_BEFORE_DONE = 3
 CHECKPOINT_INTERVAL = 100
+COMPUTER_USE_STATUS_RETRIES = 10
+COMPUTER_USE_STATUS_RETRY_DELAY = 2
 STREAM_PREVIEW_RETRIES = 6
 STREAM_PREVIEW_RETRY_DELAY = 2
 
@@ -82,6 +84,43 @@ async def get_stream_url(desktop):
         if attempt < STREAM_PREVIEW_RETRIES - 1:
             await asyncio.sleep(STREAM_PREVIEW_RETRY_DELAY)
     return None
+
+
+def is_computer_use_ready(status):
+    """Return true when Daytona reports the desktop/VNC processes are running."""
+    status_text = json.dumps(status, default=str).lower()
+    if not any(value in status_text for value in ("ready", "running", "started")):
+        return False
+    return not any(value in status_text for value in ("error", "failed", "stopped", "stopping"))
+
+
+async def start_computer_use(desktop):
+    """Start and wait briefly for Daytona desktop processes before streaming."""
+    await asyncio.to_thread(desktop.computer_use.start)
+
+    for attempt in range(COMPUTER_USE_STATUS_RETRIES):
+        try:
+            response = await asyncio.to_thread(desktop.computer_use.get_status)
+            status = getattr(response, "status", response)
+            if is_computer_use_ready(status):
+                return True
+            logger.info(
+                "Waiting for computer-use status (attempt %d/%d): %s",
+                attempt + 1,
+                COMPUTER_USE_STATUS_RETRIES,
+                status,
+            )
+        except Exception as exc:
+            logger.info(
+                "Waiting for computer-use status (attempt %d/%d): %s",
+                attempt + 1,
+                COMPUTER_USE_STATUS_RETRIES,
+                exc,
+            )
+        if attempt < COMPUTER_USE_STATUS_RETRIES - 1:
+            await asyncio.sleep(COMPUTER_USE_STATUS_RETRY_DELAY)
+
+    return False
 
 
 async def call_with_retry(client, **kwargs):
@@ -317,7 +356,9 @@ async def main():
             logger.info("Reconnecting to sandbox %s", reconnect_sandbox_id)
             desktop = daytona_client.get(reconnect_sandbox_id)
             desktop.start()
-            desktop.computer_use.start()
+            computer_use_ready = await start_computer_use(desktop)
+            if not computer_use_ready:
+                logger.warning("Computer-use status did not become ready before preview lookup")
             stream_url = await get_stream_url(desktop)
             if stream_url:
                 await emit("agent:stream_ready", {"streamUrl": stream_url})
@@ -326,7 +367,9 @@ async def main():
             logger.info("Reconnected to sandbox %s, stream at %s", reconnect_sandbox_id, stream_url)
         else:
             desktop = daytona_client.create()
-            desktop.computer_use.start()
+            computer_use_ready = await start_computer_use(desktop)
+            if not computer_use_ready:
+                logger.warning("Computer-use status did not become ready before preview lookup")
             desktop.set_auto_delete_interval(0)
             stream_url = await get_stream_url(desktop)
             await emit("agent:sandbox_ready", {"sandboxId": desktop.id})

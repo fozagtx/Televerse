@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AgentActivity } from "@/lib/mock-data";
-import { Monitor, Search, FileText, Wifi, Check } from "lucide-react";
+import { Monitor, Search, FileText } from "lucide-react";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface AgentScreenProps {
   agentId: string;
@@ -57,23 +55,6 @@ export function AgentScreen({ agentId, activity, status }: AgentScreenProps) {
 }
 
 function BootSequence({ gradient }: { gradient?: string }) {
-  const [phase, setPhase] = useState(0);
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 1500);
-    const t2 = setTimeout(() => setPhase(2), 3500);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
-
-  const phases = [
-    { label: "Booting sandbox", icon: Monitor },
-    { label: "Connecting stream", icon: Wifi },
-    { label: "Ready", icon: Check },
-  ];
-
   return (
     <div
       className={`flex h-full items-center justify-center bg-gradient-to-br ${gradient || "from-slate-950 to-zinc-950"}`}
@@ -83,43 +64,13 @@ function BootSequence({ gradient }: { gradient?: string }) {
           <Monitor className="size-6 text-muted-foreground" />
         </div>
 
-        <div className="space-y-4">
-          {phases.map((p, i) => {
-            const Icon = p.icon;
-            const isActive = i === phase;
-            const isDone = i < phase;
-
-            return (
-              <div
-                key={i}
-                className={cn(
-                  "flex items-center gap-3 text-sm transition-all duration-300",
-                  isActive
-                    ? "text-foreground"
-                    : isDone
-                      ? "text-muted-foreground/60"
-                      : "text-muted-foreground/30"
-                )}
-              >
-                {isDone ? (
-                  <Check className="size-4 text-emerald-400" />
-                ) : isActive ? (
-                  <Loader2 className="size-4 animate-spin text-primary" />
-                ) : (
-                  <Icon className="size-4" />
-                )}
-                <span>{p.label}</span>
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-3 text-sm text-foreground">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span>Booting sandbox</span>
         </div>
 
-        {/* Progress bar */}
         <div className="w-48 mx-auto h-1 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary/60 rounded-full transition-all duration-1000 ease-out"
-            style={{ width: `${((phase + 1) / phases.length) * 100}%` }}
-          />
+          <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/60" />
         </div>
       </div>
     </div>
