@@ -42,9 +42,10 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!process.env.E2B_API_KEY) {
+  const e2bApiKey = process.env.E2B_API_KEY?.trim();
+  if (!e2bApiKey || !e2bApiKey.startsWith("e2b_")) {
     return NextResponse.json(
-      { error: "E2B_API_KEY is not configured on the server" },
+      { error: "E2B_API_KEY must be a valid E2B key beginning with e2b_" },
       { status: 503 },
     );
   }
