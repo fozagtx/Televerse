@@ -58,7 +58,7 @@ Televerse Web App (Next.js 16 + Socket.io)
   server.ts             Custom HTTP server with Socket.io
 /workers
   worker.py             Python agent worker
-  e2b_tools.py          Daytona sandbox tool wrappers
+  daytona_tools.py      Daytona sandbox tool wrappers
   replay.py             Session replay recording
   /tools                Additional tool modules
 ```

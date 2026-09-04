@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
-import e2b_tools as desktop_tools
+import daytona_tools as desktop_tools
 from memory import MemoryManager
 from replay import ReplayBuffer
 
@@ -45,6 +45,8 @@ HISTORY_KEEP_RECENT = 10
 THUMBNAIL_INTERVAL_SECONDS = 10
 MIN_STEPS_BEFORE_DONE = 3
 CHECKPOINT_INTERVAL = 100
+STREAM_PREVIEW_RETRIES = 6
+STREAM_PREVIEW_RETRY_DELAY = 2
 
 
 def make_screenshot_message():
@@ -55,6 +57,31 @@ def make_screenshot_message():
         "content": f"Here is the current screenshot. The agent loop is running. What action should you take next?",
     }
     return msg, raw_bytes
+
+
+async def get_stream_url(desktop):
+    """Wait for the sandbox's noVNC port to become available.
+
+    Sandbox creation and the desktop service startup are asynchronous. A
+    single get_preview_link call can therefore race the service and return no
+    URL, leaving the browser stuck in its boot state forever.
+    """
+    for attempt in range(STREAM_PREVIEW_RETRIES):
+        try:
+            preview = desktop.get_preview_link(6080)
+            url = getattr(preview, "url", None)
+            if url:
+                return url
+        except Exception as exc:
+            logger.info(
+                "Waiting for noVNC preview (attempt %d/%d): %s",
+                attempt + 1,
+                STREAM_PREVIEW_RETRIES,
+                exc,
+            )
+        if attempt < STREAM_PREVIEW_RETRIES - 1:
+            await asyncio.sleep(STREAM_PREVIEW_RETRY_DELAY)
+    return None
 
 
 async def call_with_retry(client, **kwargs):
@@ -291,27 +318,22 @@ async def main():
             desktop = daytona_client.get(reconnect_sandbox_id)
             desktop.start()
             desktop.computer_use.start()
-            # Get a noVNC preview URL for the browser stream
-            try:
-                preview = desktop.get_preview_link(6080)
-                stream_url = preview.url
-            except Exception:
-                stream_url = None
+            stream_url = await get_stream_url(desktop)
             if stream_url:
                 await emit("agent:stream_ready", {"streamUrl": stream_url})
+            else:
+                await emit("agent:error", {"error": "Sandbox desktop stream did not become available"})
             logger.info("Reconnected to sandbox %s, stream at %s", reconnect_sandbox_id, stream_url)
         else:
             desktop = daytona_client.create()
             desktop.computer_use.start()
             desktop.set_auto_delete_interval(0)
-            try:
-                preview = desktop.get_preview_link(6080)
-                stream_url = preview.url
-            except Exception:
-                stream_url = None
+            stream_url = await get_stream_url(desktop)
             await emit("agent:sandbox_ready", {"sandboxId": desktop.id})
             if stream_url:
                 await emit("agent:stream_ready", {"streamUrl": stream_url})
+            else:
+                await emit("agent:error", {"error": "Sandbox desktop stream did not become available"})
             logger.info("Sandbox booted (id=%s), stream at %s", desktop.id, stream_url)
     except Exception as e:
         logger.error("Failed to boot/reconnect sandbox: %s", e)
