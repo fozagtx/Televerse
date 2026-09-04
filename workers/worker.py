@@ -8,7 +8,7 @@ import time
 from io import BytesIO
 
 import socketio
-from daytona import Daytona
+from daytona import Daytona, DaytonaConfig
 from openai import AsyncOpenAI
 from PIL import Image
 
@@ -121,6 +121,20 @@ async def start_computer_use(desktop):
             await asyncio.sleep(COMPUTER_USE_STATUS_RETRY_DELAY)
 
     return False
+
+
+def create_daytona_client():
+    api_key = os.environ.get("DAYTONA_API_KEY")
+    if not api_key:
+        raise RuntimeError("DAYTONA_API_KEY is not configured; cannot create a Daytona sandbox")
+
+    return Daytona(
+        DaytonaConfig(
+            api_key=api_key,
+            api_url=os.environ.get("DAYTONA_API_URL", "https://app.daytona.io/api"),
+            target=os.environ.get("DAYTONA_TARGET", "us"),
+        )
+    )
 
 
 async def call_with_retry(client, **kwargs):
@@ -349,9 +363,9 @@ async def main():
 
     # --- Boot or reconnect Daytona sandbox ---
     desktop = None
-    daytona_client = Daytona()
     reconnect_sandbox_id = os.environ.get("SANDBOX_ID")
     try:
+        daytona_client = create_daytona_client()
         if reconnect_sandbox_id:
             logger.info("Reconnecting to sandbox %s", reconnect_sandbox_id)
             desktop = daytona_client.get(reconnect_sandbox_id)
