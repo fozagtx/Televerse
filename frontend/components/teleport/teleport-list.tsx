@@ -212,7 +212,7 @@ export function TeleportModal({ open, onOpenChange, primarySessionId, onCreated 
               <h3 className="text-sm font-semibold">Teleport launched</h3>
             </div>
             <p className="text-xs text-zinc-400">
-              An agent is now investigating in an isolated workspace. The primary session is not interrupted.
+              An agent is now investigating in an isolated workspace. Your session is not interrupted.
             </p>
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
               <div className="text-[10px] uppercase tracking-wide text-zinc-500">Teleport ID</div>
@@ -249,7 +249,7 @@ export function TeleportModal({ open, onOpenChange, primarySessionId, onCreated 
               <h3 className="text-sm font-semibold text-zinc-100">Teleport Agent</h3>
             </div>
             <p className="text-xs text-zinc-500">
-              Delegate a side task to an isolated computer-use agent. Your primary agent continues uninterrupted.
+              Delegate a side task to an isolated computer-use agent. Your current agent continues uninterrupted.
             </p>
 
             <div className="space-y-1.5">

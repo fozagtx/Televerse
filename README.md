@@ -4,13 +4,13 @@ Agent Teleportation for Codex. Teleport isolated agents into cloud desktops to i
 
 ## How It Works
 
-1. **Your primary agent is running** a Televerse session (e.g. building a checkout flow)
+1. **Your agent is running** a Televerse session (e.g. building a checkout flow)
 2. **A side problem appears** — a bug, test failure, unclear error, browser issue
 3. **Teleport an agent** via the UI (`⚡ Teleport` button) or WebMCP (`teleport_agent` tool)
-4. **Televerse captures context** from the primary session: prompt, recent todos, whiteboard, errors, relevant files
+4. **Televerse captures context** from the session: prompt, recent todos, whiteboard, errors, relevant files
 5. **A fresh agent spawns** in an isolated Daytona sandbox with its own browser and terminal
 6. **The teleported agent investigates** — reproduces the issue, inspects logs, runs tests, collects evidence
-7. **Results become reviewable** — the primary agent or human reviews the structured findings, root cause, evidence, and optional patch
+7. **Results become reviewable** — the user or agent reviews the structured findings, root cause, evidence, and optional patch
 8. **Apply or discard** — the patch can be reviewed, applied, or discarded via the UI or WebMCP
 
 ## Architecture
@@ -69,7 +69,7 @@ Televerse exposes 7 tools via `document.modelContext` for AI agents (Codex, Chat
 
 | Tool | Purpose |
 |---|---|
-| `teleport_agent` | Create a teleport from a primary session |
+| `teleport_agent` | Create a teleport from a session |
 | `list_teleports` | List teleports for a session or user |
 | `get_teleport_status` | Poll lifecycle phase and activity |
 | `retrieve_teleport_result` | Get structured findings, evidence, patch |
@@ -134,7 +134,7 @@ npx vitest run lib/teleport/__tests__/store.test.ts
 - **WebMCP is the agent interface** — Codex/ChatGPT discovers tools via `document.modelContext`. No backend MCP server needed.
 - **No LLM key required** — The WebMCP path is pure REST. You only need `DAYTONA_API_KEY` for sandbox provisioning.
 - **Context capture is compact** — The teleported agent receives a focused context packet (prompt, recent todos, errors, whiteboard), not the full conversation.
-- **Isolation is real** — Every teleport gets its own Daytona sandbox, Socket.io room, and whiteboard. The primary session is never touched.
+- **Isolation is real** — Every teleport gets its own Daytona sandbox, Socket.io room, and whiteboard. The original session is never touched.
 
 ## Deploy
 

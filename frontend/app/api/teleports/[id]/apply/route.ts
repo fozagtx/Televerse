@@ -29,7 +29,7 @@ export async function POST(
   return NextResponse.json({
     ok: true,
     message:
-      "Patch marked as applied. Televerse does not auto-merge into the primary workspace; a human or the primary agent must perform the actual merge. Use this call as a coordination signal.",
+      "Patch marked as applied. Televerse does not auto-merge into the workspace; a human or the agent must perform the actual merge. Use this call as a coordination signal.",
     teleport: updated,
   });
 }

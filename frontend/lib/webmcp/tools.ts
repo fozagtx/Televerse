@@ -55,7 +55,7 @@ export const teleportAgentTool: ToolDefinition<{
 }> = {
   name: "teleport_agent",
   description:
-    "Use this when a side investigation, debugging task, research task, browser task, test investigation, or other secondary task would interrupt the user's primary coding workflow. Teleports a temporary computer-use agent into an isolated Televerse workspace. The teleported agent receives context from the primary session, works independently, and returns structured findings (and optionally a patch). Your primary session continues running uninterrupted. Returns a stable teleport ID to track with get_teleport_status and retrieve_teleport_result.",
+    "Use this when a side investigation, debugging task, research task, browser task, test investigation, or other secondary task would interrupt the user's current coding workflow. Teleports a temporary computer-use agent into an isolated Televerse workspace. The teleported agent receives context from the session, works independently, and returns structured findings (and optionally a patch). The current session continues running uninterrupted. Returns a stable teleport ID to track with get_teleport_status and retrieve_teleport_result.",
   inputSchema: {
     type: "object",
     required: ["primarySessionId", "task"],
@@ -308,7 +308,7 @@ export const retrieveTeleportResultTool: ToolDefinition<{ teleportId: string }> 
 export const applyTeleportPatchTool: ToolDefinition<{ teleportId: string }> = {
   name: "apply_teleport_patch",
   description:
-    "Coordinate applying a completed teleport's patch. Televerse never auto-merges into the primary workspace — it marks the patch as applied so the primary agent/human knows it's been reviewed. Only call after retrieve_teleport_result shows a reviewable status. Returns a coordination acknowledgement; the actual merge is the caller's responsibility.",
+    "Coordinate applying a completed teleport's patch. Televerse never auto-merges into the workspace — it marks the patch as applied so the user knows it's been reviewed. Only call after retrieve_teleport_result shows a reviewable status. Returns a coordination acknowledgement; the actual merge is the caller's responsibility.",
   inputSchema: {
     type: "object",
     required: ["teleportId"],

@@ -407,7 +407,7 @@ export default function Home() {
                 </button>
               </div>
               <p className="text-xs text-zinc-500">
-                Side tasks delegated to isolated agents. Your primary session continues uninterrupted.
+                Side tasks delegated to isolated agents. Your session continues uninterrupted.
               </p>
               <TeleportList compact />
             </div>
