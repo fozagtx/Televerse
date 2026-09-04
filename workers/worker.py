@@ -6,6 +6,7 @@ import os
 import sys
 import time
 from io import BytesIO
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import socketio
 from daytona import Daytona
@@ -105,6 +106,17 @@ class DaytonaDesktop:
 
     def kill(self):
         self.sandbox.delete(wait=False)
+
+
+def daytona_stream_url(sandbox):
+    """Return a signed noVNC URL without Daytona's unsigned preview warning."""
+    preview = sandbox.create_signed_preview_url(6080, expires_in_seconds=3600)
+    parts = urlsplit(preview.url)
+    query = dict(parse_qsl(parts.query))
+    query.update({"autoconnect": "true", "resize": "scale"})
+    return urlunsplit(
+        (parts.scheme, parts.netloc, f"{parts.path.rstrip('/')}/vnc.html", urlencode(query), parts.fragment)
+    )
 
 
 def make_screenshot_message():
@@ -369,14 +381,14 @@ async def main():
             sandbox = daytona.get(reconnect_sandbox_id)
             sandbox.start(timeout=60)
             sandbox.computer_use.start()
-            stream_url = f"{sandbox.get_preview_link(6080).url.rstrip('/')}/vnc.html?autoconnect=true&resize=scale"
+            stream_url = daytona_stream_url(sandbox)
             desktop = DaytonaDesktop(sandbox)
             await emit("agent:stream_ready", {"streamUrl": stream_url})
             logger.info("Reconnected to sandbox %s, stream at %s", reconnect_sandbox_id, stream_url)
         else:
             sandbox = daytona.create()
             sandbox.computer_use.start()
-            stream_url = f"{sandbox.get_preview_link(6080).url.rstrip('/')}/vnc.html?autoconnect=true&resize=scale"
+            stream_url = daytona_stream_url(sandbox)
             desktop = DaytonaDesktop(sandbox)
             await emit("agent:sandbox_ready", {"sandboxId": desktop.sandbox_id})
             await emit("agent:stream_ready", {"streamUrl": stream_url})
