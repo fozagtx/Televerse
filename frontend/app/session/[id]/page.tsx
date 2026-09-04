@@ -35,18 +35,26 @@ import { ThinkingBottomSheet } from "@/components/thinking-bottom-sheet";
 import { useIsDesktop, useIsMobile } from "@/hooks/use-media-query";
 import { Loader2 } from "lucide-react";
 
-function SessionContent() {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter();
+interface SessionWorkspaceProps {
+  sessionId: string;
+  initialPrompt?: string;
+  agentCount?: number;
+  embedded?: boolean;
+}
 
-  const sessionId = params.id as string;
+export function SessionWorkspace({
+  sessionId,
+  initialPrompt = "",
+  agentCount = 4,
+  embedded = false,
+}: SessionWorkspaceProps) {
+  const router = useRouter();
   const isMock = sessionId === "demo";
 
-  const agentCountParam = parseInt(searchParams.get("agents") || "4", 10);
+  const agentCountParam = agentCount;
 
   const [prompt, setPrompt] = useState(
-    searchParams.get("prompt") || (isMock ? MOCK_PROMPT : "")
+    initialPrompt || (isMock ? MOCK_PROMPT : "")
   );
 
   const socketRef = useRef<Socket | null>(null);
@@ -487,7 +495,7 @@ function SessionContent() {
   const effectiveViewMode = isMobile ? "tabs" : viewMode;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className={embedded ? "flex h-full min-h-[640px] flex-col" : "flex h-screen flex-col"}>
       {/* Recovering banner */}
       {isRecovering && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-secondary px-3 py-2 text-foreground lg:gap-3 lg:px-5 lg:py-3">
@@ -617,6 +625,19 @@ function SessionContent() {
         />
       )}
     </div>
+  );
+}
+
+function SessionContent() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+
+  return (
+    <SessionWorkspace
+      sessionId={params.id as string}
+      initialPrompt={searchParams.get("prompt") || ""}
+      agentCount={parseInt(searchParams.get("agents") || "4", 10)}
+    />
   );
 }
 

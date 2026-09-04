@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { Loader2, Play, RotateCcw } from "lucide-react";
+import { SessionWorkspace } from "./session/[id]/page";
 
 const EXAMPLE_PROMPTS = [
   {
@@ -28,10 +27,10 @@ const EXAMPLE_PROMPTS = [
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
+  const [activePrompt, setActivePrompt] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const router = useRouter();
 
   const handleSubmit = async () => {
     if (!prompt.trim() || isSubmitting) return;
@@ -44,87 +43,137 @@ export default function Home() {
         body: JSON.stringify({
           prompt: prompt.trim(),
           agentCount: 1,
+          autoStart: true,
         }),
       });
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to create session");
+        throw new Error(data.error || "Failed to start sandbox");
       }
-      const { sessionId } = await response.json();
-      router.push(`/session/${sessionId}/approve`);
+      setActivePrompt(prompt.trim());
+      setSessionId(data.sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
       setIsSubmitting(false);
     }
   };
 
+  const resetSession = () => {
+    setSessionId(null);
+    setActivePrompt("");
+    setError(null);
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <h1 className="min-w-0 text-lg font-bold text-foreground">Televerse</h1>
-          <Link href="/dev/mcp" className="shrink-0">
-            <Button variant="outline" size="sm" className="text-foreground">
-              Dev Tools
-            </Button>
-          </Link>
-        </div>
-      </header>
+    <div className="flex min-h-screen bg-background text-foreground">
+      <main className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="flex min-h-[360px] flex-col border-b border-border bg-card lg:h-screen lg:border-b-0 lg:border-r">
+          <div className="border-b border-border px-4 py-4 sm:px-5">
+            <h1 className="text-lg font-bold text-foreground">Televerse</h1>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              One prompt starts one sandbox. The live browser, VNC, and action log stay on this screen.
+            </p>
+          </div>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-10 sm:px-6 sm:py-12">
-        <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
-          Teleport an agent to fix a side problem
-        </h2>
-        <p className="mt-3 max-w-2xl text-muted-foreground">
-          One isolated sandbox spawns, investigates, and returns findings. Your main work continues.
-        </p>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:px-5">
+            <div className="min-h-0 flex-1">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Agent instruction
+              </label>
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Tell the agent what to do in the web app, fields, browser, or sandbox..."
+                className="h-[220px] min-h-[180px] resize-none text-sm lg:h-full"
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+            </div>
 
-        <div className="mt-8 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-          <Textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Investigate why the checkout API is returning 500..."
-            className="min-h-[140px] resize-none border-0 bg-transparent px-4 pt-4 pb-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-0 sm:px-5"
-          />
-          <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-sm text-muted-foreground">1 sandbox will be spawned</span>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !prompt.trim()}
-              className="w-full gap-2 sm:w-auto"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Decomposing...
-                </>
-              ) : (
-                <>
-                  Teleport
-                  <ArrowRight className="size-4" />
-                </>
+            {error && (
+              <div className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground">
+                {error}
+              </div>
+            )}
+
+            {!sessionId && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Examples
+                </p>
+                <div className="flex flex-wrap gap-2 lg:flex-col">
+                  {EXAMPLE_PROMPTS.map((example) => (
+                    <button
+                      key={example.label}
+                      onClick={() => setPrompt(example.prompt)}
+                      className="rounded-md border border-border bg-background px-3 py-2 text-left text-xs text-foreground hover:bg-accent"
+                    >
+                      {example.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !prompt.trim()}
+                className="h-11 w-full gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Starting
+                  </>
+                ) : (
+                  <>
+                    <Play className="size-4" />
+                    Start Sandbox
+                  </>
+                )}
+              </Button>
+
+              {sessionId && (
+                <Button
+                  variant="outline"
+                  onClick={resetSession}
+                  className="h-11 w-full gap-2"
+                >
+                  <RotateCcw className="size-3.5" />
+                  New Task
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
-        </div>
+        </aside>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          {EXAMPLE_PROMPTS.map((example) => (
-            <button
-              key={example.label}
-              onClick={() => setPrompt(example.prompt)}
-              className="rounded-full border border-border bg-background px-4 py-1.5 text-sm text-foreground hover:bg-accent"
-            >
-              {example.label}
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div className="mt-6 rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground">
-            {error}
-          </div>
-        )}
+        <section className="min-h-[520px] bg-background lg:h-screen lg:min-h-0 lg:overflow-hidden">
+          {sessionId ? (
+            <SessionWorkspace
+              sessionId={sessionId}
+              initialPrompt={activePrompt}
+              agentCount={1}
+              embedded
+            />
+          ) : (
+            <div className="flex h-full min-h-[520px] items-center justify-center px-4 py-10 text-center">
+              <div className="max-w-md space-y-3">
+                <h2 className="text-2xl font-bold text-foreground">
+                  Sandbox ready area
+                </h2>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Enter the instruction on the left. After start, the agent browser, VNC stream, actions, and task state appear here.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { createSession, addTodos, getSession } from "@/lib/session-store";
-import { auth } from "@/auth";
+import { approveSession, createSession, addTodos, getSession } from "@/lib/session-store";
 import { getMaxAgentsForUser } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +10,14 @@ import {
   persistSessionStatus,
 } from "@/lib/db/session-persist";
 import { decomposeTasks, type DecomposedTask } from "@/lib/orchestrator";
+import { spawnWorkers } from "@/lib/worker-manager";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { prompt, agentCount } = body as {
+  const { prompt, agentCount, autoStart = false } = body as {
     prompt: string;
     agentCount: number;
+    autoStart?: boolean;
   };
 
   if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -79,13 +80,19 @@ export async function POST(request: Request) {
   // Persist todos to database
   persistTodos(sessionId, todos).catch(console.error);
 
-  // Set session to pending_approval so the user can review tasks
   const opticonSession = getSession(sessionId);
-  if (opticonSession) {
+  if (autoStart) {
+    approveSession(sessionId);
+    persistSessionStatus(sessionId, "running").catch(console.error);
+    spawnWorkers(sessionId, agentCount);
+  } else if (opticonSession) {
+    // Set session to pending_approval so legacy approval screens keep working.
     opticonSession.status = "pending_approval";
-    // Persist status update
     persistSessionStatus(sessionId, "pending_approval").catch(console.error);
   }
 
-  return NextResponse.json({ sessionId, tasks: todos }, { status: 201 });
+  return NextResponse.json(
+    { sessionId, tasks: todos, status: autoStart ? "running" : "pending_approval" },
+    { status: 201 }
+  );
 }
