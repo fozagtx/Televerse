@@ -3,3 +3,5 @@
 __pycache__/
 workers/__pycache__
 .memories/
+symphony/node_modules
+symphony/.next

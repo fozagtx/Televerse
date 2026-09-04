@@ -1,8 +1,7 @@
 services:
   - type: web
     name: televerse
-    runtime: image
-    repo: https://github.com/fozagtx/Televerse
+    runtime: docker
     dockerfilePath: ./Dockerfile
     envVars:
       - key: NODE_ENV
