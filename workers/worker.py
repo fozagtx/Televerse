@@ -48,26 +48,11 @@ CHECKPOINT_INTERVAL = 100
 
 
 def make_screenshot_message():
-    """Capture the desktop and return (message_dict, raw_png_bytes)."""
+    """Return a text-only user message (no image, model doesn't support vision)."""
     raw_bytes = desktop_tools.screenshot_raw_bytes()
-
-    img = Image.open(BytesIO(raw_bytes))
-    jpeg_buf = BytesIO()
-    img.save(jpeg_buf, format="JPEG", quality=75)
-    jpeg_b64 = base64.b64encode(jpeg_buf.getvalue()).decode("utf-8")
-
     msg = {
         "role": "user",
-        "content": [
-            {"type": "text", "text": "Here is the current screenshot of the desktop:"},
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{jpeg_b64}",
-                },
-            },
-            {"type": "text", "text": "What action should you take next?"},
-        ],
+        "content": f"Here is the current screenshot. The agent loop is running. What action should you take next?",
     }
     return msg, raw_bytes
 
