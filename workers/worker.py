@@ -8,7 +8,7 @@ import time
 from io import BytesIO
 
 import socketio
-from e2b import Sandbox
+from e2b_desktop import Sandbox
 from openai import AsyncOpenAI
 from PIL import Image
 
