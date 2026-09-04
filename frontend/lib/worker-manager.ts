@@ -91,10 +91,10 @@ export function spawnWorkers(sessionId: string, agentCount: number): void {
         SESSION_ID: sessionId,
         AGENT_ID: agentId,
         USER_ID: session.userId || "",
-SOCKET_URL: process.env.WORKER_SOCKET_URL || `http://localhost:${process.env.PORT || "3000"}`,
-FEATHERLESS_API_KEY: process.env.FEATHERLESS_API_KEY || "",
+        SOCKET_URL: process.env.WORKER_SOCKET_URL || `http://localhost:${process.env.PORT || "3000"}`,
+        FEATHERLESS_API_KEY: process.env.FEATHERLESS_API_KEY || "",
         FEATHERLESS_MODEL: process.env.FEATHERLESS_MODEL || "zai-org/GLM-5.3",
-E2B_API_KEY: process.env.E2B_API_KEY || "",
+        DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || "",
         // Panopticon: Enable long-running mode for Panopticon sessions
         PANOPTICON_MODE: session.isPanopticon ? "true" : "false",
         // Slack: enable step checkpoints when running from a Slack session
@@ -158,7 +158,7 @@ export function respawnWorker(sessionId: string, agent: Agent): void {
       SOCKET_URL: process.env.WORKER_SOCKET_URL || `http://localhost:${process.env.PORT || "3000"}`,
       DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || "",
       FEATHERLESS_API_KEY: process.env.FEATHERLESS_API_KEY || "",
-        FEATHERLESS_MODEL: process.env.FEATHERLESS_MODEL || "zai-org/GLM-5.3",
+      FEATHERLESS_MODEL: process.env.FEATHERLESS_MODEL || "zai-org/GLM-5.3",
       SANDBOX_ID: agent.sandboxId || "",
     },
     stdio: ["pipe", "pipe", "pipe"],

@@ -8,7 +8,7 @@ import time
 from io import BytesIO
 
 import socketio
-from e2b_desktop import Sandbox
+from daytona import Daytona
 from openai import AsyncOpenAI
 from PIL import Image
 
@@ -45,6 +45,60 @@ HISTORY_KEEP_RECENT = 10
 THUMBNAIL_INTERVAL_SECONDS = 10
 MIN_STEPS_BEFORE_DONE = 3
 CHECKPOINT_INTERVAL = 100
+
+
+class DaytonaDesktop:
+    """Adapt Daytona Computer Use calls to the existing desktop tool API."""
+
+    def __init__(self, sandbox):
+        self.sandbox = sandbox
+        self.sandbox_id = sandbox.id
+        self._mouse_position = (0, 0)
+
+    @staticmethod
+    def _image_bytes(response):
+        image = getattr(response, "image", None) or getattr(response, "data", None)
+        if isinstance(image, str):
+            return base64.b64decode(image)
+        return bytes(image)
+
+    def screenshot(self):
+        return self._image_bytes(self.sandbox.computer_use.screenshot.take_full_screen())
+
+    def left_click(self, x, y):
+        self.sandbox.computer_use.mouse.click(x, y, button="left")
+
+    def right_click(self, x, y):
+        self.sandbox.computer_use.mouse.click(x, y, button="right")
+
+    def middle_click(self, x, y):
+        self.sandbox.computer_use.mouse.click(x, y, button="middle")
+
+    def double_click(self, x, y):
+        self.sandbox.computer_use.mouse.click(x, y, double=True)
+
+    def write(self, text):
+        self.sandbox.computer_use.keyboard.type(text)
+
+    def press(self, key):
+        if isinstance(key, list):
+            self.sandbox.computer_use.keyboard.hotkey("+".join(key))
+        else:
+            self.sandbox.computer_use.keyboard.press(key)
+
+    def move_mouse(self, x, y):
+        self._mouse_position = (x, y)
+        self.sandbox.computer_use.mouse.move(x, y)
+
+    def scroll(self, direction="down", amount=3):
+        x, y = self._mouse_position
+        self.sandbox.computer_use.mouse.scroll(x, y, direction, amount)
+
+    def pause(self):
+        self.sandbox.pause()
+
+    def kill(self):
+        self.sandbox.delete(wait=False)
 
 
 def make_screenshot_message():
@@ -299,24 +353,28 @@ async def main():
     async def on_checkpoint_resume(data=None):
         checkpoint_resume.set()
 
-    # --- Boot or reconnect E2B sandbox ---
+    # --- Boot or reconnect Daytona sandbox ---
     desktop = None
     reconnect_sandbox_id = os.environ.get("SANDBOX_ID")
+    daytona = Daytona()
     try:
         if reconnect_sandbox_id:
             logger.info("Reconnecting to sandbox %s", reconnect_sandbox_id)
-            desktop = Sandbox(sandbox_id=reconnect_sandbox_id, timeout=3600)
-            desktop.stream.start()
-            stream_url = desktop.stream.get_url()
+            sandbox = daytona.get(reconnect_sandbox_id)
+            sandbox.start(timeout=60)
+            sandbox.computer_use.start()
+            stream_url = f"{sandbox.get_preview_link(6080).url.rstrip('/')}/vnc.html?autoconnect=true&resize=scale"
+            desktop = DaytonaDesktop(sandbox)
             await emit("agent:stream_ready", {"streamUrl": stream_url})
             logger.info("Reconnected to sandbox %s, stream at %s", reconnect_sandbox_id, stream_url)
         else:
-            desktop = Sandbox.create(timeout=3600)
-            desktop.stream.start()
-            stream_url = desktop.stream.get_url()
+            sandbox = daytona.create()
+            sandbox.computer_use.start()
+            stream_url = f"{sandbox.get_preview_link(6080).url.rstrip('/')}/vnc.html?autoconnect=true&resize=scale"
+            desktop = DaytonaDesktop(sandbox)
             await emit("agent:sandbox_ready", {"sandboxId": desktop.sandbox_id})
             await emit("agent:stream_ready", {"streamUrl": stream_url})
-            logger.info("Sandbox booted (id=%s), stream at %s", desktop.sandbox_id, stream_url)
+            logger.info("Daytona sandbox booted (id=%s), stream at %s", desktop.sandbox_id, stream_url)
     except Exception as e:
         logger.error("Failed to boot/reconnect sandbox: %s", e)
         if reconnect_sandbox_id:

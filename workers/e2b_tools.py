@@ -5,7 +5,7 @@ _sandbox = None
 
 
 def init(sandbox):
-    """Set the E2B sandbox instance used by all tool functions."""
+    """Set the desktop adapter used by all tool functions."""
     global _sandbox
     _sandbox = sandbox
 

@@ -18,12 +18,16 @@ services:
         value: https://televerse-egjd.onrender.com
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: E2B_API_KEY
+      - key: FEATHERLESS_API_KEY
+        sync: false
+      - key: FEATHERLESS_MODEL
+        value: zai-org/GLM-5.3
+      - key: DAYTONA_API_KEY
         sync: false
       - key: PYTHON_PATH
         value: /app/.venv/bin/python3
       - key: PROJECT_ROOT
         value: /app
       - key: WORKER_SOCKET_URL
-        value: http://127.0.0.1:3000
+        value: https://televerse-egjd.onrender.com
     healthCheckPath: /

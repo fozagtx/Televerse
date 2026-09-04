@@ -42,10 +42,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const e2bApiKey = process.env.E2B_API_KEY?.trim();
-  if (!e2bApiKey || !e2bApiKey.startsWith("e2b_")) {
+  const daytonaApiKey = process.env.DAYTONA_API_KEY?.trim();
+  if (!daytonaApiKey) {
     return NextResponse.json(
-      { error: "E2B_API_KEY must be a valid E2B key beginning with e2b_" },
+      { error: "DAYTONA_API_KEY must be configured before starting a sandbox" },
       { status: 503 },
     );
   }
