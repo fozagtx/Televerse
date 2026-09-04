@@ -199,15 +199,6 @@ export default function Home() {
                 Panopticon
               </Button>
             </Link>
-            <Link href="/pricing" className="hidden sm:inline-flex">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground text-xs"
-              >
-                Pricing
-              </Button>
-            </Link>
             <Button
               variant="ghost"
               size="sm"
@@ -290,7 +281,7 @@ export default function Home() {
                             type="button"
                             onClick={() => {
                               if (isLocked) {
-                                router.push("/pricing");
+                                setAgentCount(4);
                               } else {
                                 setAgentCount(n);
                               }
@@ -303,7 +294,7 @@ export default function Home() {
                             }
                             className={`flex size-7 items-center justify-center rounded-md text-xs font-medium transition-all ${
                               isLocked
-                                ? "text-muted-foreground cursor-pointer hover:text-foreground"
+                                ? "text-muted-foreground cursor-not-allowed"
                                 : agentCount === n
                                   ? "bg-primary/15 text-primary ring-1 ring-primary/30"
                                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
