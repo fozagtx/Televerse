@@ -1,4 +1,5 @@
 daytona
+openai
 Pillow
 imageio
 numpy

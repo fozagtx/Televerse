@@ -21,17 +21,17 @@ const EXAMPLE_PROMPTS = [
   {
     label: "Browser QA Testing",
     prompt:
-      "Run automated QA testing of our web app across Chrome, Firefox, and Safari. Check for layout issues, broken links, form validation, and console errors on each browser.",
+      "Clone the repo at https://github.com/example/checkout-app, open it in the browser, and run the QA test suite. Check for console errors, broken layout, and form validation issues. Report every failure with screenshots.",
   },
   {
     label: "Install OpenClaw",
     prompt:
-      "Install OpenClaw by running: curl -fsSL https://openclaw.ai/install.sh | bash",
+      "Open a terminal, install OpenClaw by running curl -fsSL https://openclaw.ai/install.sh | bash, verify it installed correctly, and report back the version.",
   },
   {
-    label: "Research Paper",
+    label: "Debug Payment 500",
     prompt:
-      "Write a comprehensive research paper on Google Docs about the rise of Daedalus Labs",
+      "Clone the checkout repo, open the app in the browser, reproduce the payment 500 error. Inspect the network tab, check the console, and look at the payment handler code. Find the root cause and return a patch.",
   },
   {
     label: "Data Dashboard",
@@ -39,16 +39,14 @@ const EXAMPLE_PROMPTS = [
       "Build an interactive sales dashboard with charts and filters using a spreadsheet app. Include monthly revenue, top products, and regional breakdowns.",
   },
   {
-    label: "Long-Term AI Research",
+    label: "Research + Fix Bug",
     prompt:
-      "Conduct extensive research on the latest AI agent frameworks, spend several hours browsing papers, GitHub repos, and documentation. Create a detailed comparison matrix in a spreadsheet.",
-    panopticon: true,
+      "Clone the repo, open the project in the browser, reproduce the reported rendering bug. Inspect the CSS and JS, identify the root cause, and prepare a fix. Run the existing tests to confirm the fix doesn't break anything.",
   },
   {
-    label: "Market Analysis Deep-Dive",
+    label: "Market Analysis",
     prompt:
-      "Research the competitive landscape for AI development tools. Monitor pricing changes, feature releases, and community sentiment across 10+ companies for multiple hours. Track everything in a comprehensive document.",
-    panopticon: true,
+      "Research the competitive landscape for AI development tools. Monitor pricing changes, feature releases, and community sentiment across 10+ companies. Track everything in a comprehensive document.",
   },
 ];
 

@@ -9,6 +9,7 @@ from io import BytesIO
 
 import socketio
 from daytona import Daytona
+from openai import AsyncOpenAI
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -18,7 +19,25 @@ from replay import ReplayBuffer
 
 logger = logging.getLogger(__name__)
 
-MODEL = None
+SYSTEM_PROMPT = (
+    "You are an AI agent controlling a Linux desktop. "
+    "You will be shown a screenshot of the current screen before each turn. "
+    "Look at the screenshot carefully, then use one of the available tools "
+    "(click, double_click, type_text, press_key, move_mouse, scroll) to interact with the desktop. "
+    "You can only use ONE tool per turn. After your action, you'll receive a new screenshot.\n\n"
+    "IMPORTANT RULES:\n"
+    "- If you see a blank desktop, start by opening a web browser (double-click the browser icon, "
+    "or right-click the desktop and open a terminal, then run 'firefox' or 'chromium').\n"
+    "- You MUST take real actions to accomplish the task. Do NOT call 'done' until you have "
+    "actually performed meaningful actions and can see evidence of completion on screen.\n"
+    "- Break complex tasks into steps: open the right application, navigate to the right place, "
+    "perform the action, and verify the result.\n"
+    "- When the task is genuinely complete and you can confirm it from the screenshot, "
+    "call the 'done' tool with a detailed summary of what you accomplished."
+)
+
+FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1"
+MODEL = os.environ.get("FEATHERLESS_MODEL", "zai-org/GLM-5.3")
 MAX_STEPS = 500
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
@@ -42,11 +61,9 @@ def make_screenshot_message():
         "content": [
             {"type": "text", "text": "Here is the current screenshot of the desktop:"},
             {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/jpeg",
-                    "data": jpeg_b64,
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{jpeg_b64}",
                 },
             },
             {"type": "text", "text": "What action should you take next?"},
@@ -56,10 +73,10 @@ def make_screenshot_message():
 
 
 async def call_with_retry(client, **kwargs):
-    """Call client.messages.create() with exponential backoff on failure."""
+    """Call client.chat.completions.create() with exponential backoff."""
     for attempt in range(MAX_RETRIES):
         try:
-            return await client.messages.create(**kwargs)
+            return await client.chat.completions.create(**kwargs)
         except Exception as e:
             if attempt == MAX_RETRIES - 1:
                 raise
@@ -72,12 +89,12 @@ async def call_with_retry(client, **kwargs):
 
 
 def trim_message_history(messages):
-    """Keep the task message and only the last N exchanges.
+    """Keep system + task messages and only the last N exchanges.
 
-    Anthropic pattern: user (screenshot) -> assistant (tool_use) -> user (tool_result).
+    OpenAI pattern: user (screenshot) -> assistant (tool_calls) -> tool (result).
     Each group of 3 is one exchange. Older exchanges are replaced by a summary.
     """
-    prefix_len = 1  # task message only
+    prefix_len = 2  # system + task
     body = messages[prefix_len:]
     exchange_size = 3
     keep_count = HISTORY_KEEP_RECENT * exchange_size
@@ -91,19 +108,15 @@ def trim_message_history(messages):
     summaries = []
     for msg in old_part:
         role = msg.get("role", "")
-        content = msg.get("content", [])
-        if isinstance(content, str):
-            continue
         if role == "assistant":
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "tool_use":
-                    summaries.append(f"- {block.get('name', '?')}({json.dumps(block.get('input', {}))})")
-        elif role == "user":
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "tool_result":
-                    result_content = block.get("content", "")
-                    if result_content:
-                        summaries.append(f"  -> {str(result_content)[:120]}")
+            tcs = msg.get("tool_calls") or []
+            for tc in tcs:
+                fn = tc.get("function", {})
+                summaries.append(f"- {fn.get('name', '?')}({fn.get('arguments', '')})")
+        elif role == "tool":
+            content = msg.get("content", "")
+            if content:
+                summaries.append(f"  -> {content[:120]}")
 
     summary_text = (
         f"[History summary: you already performed {len(old_part) // exchange_size} "
@@ -117,40 +130,28 @@ def trim_message_history(messages):
     ] + recent_part
 
 
-def _openai_tool_to_anthropic(tool_schema):
-    """Convert an OpenAI-format tool schema to Anthropic format."""
-    fn = tool_schema.get("function", tool_schema)
-    return {
-        "name": fn["name"],
-        "description": fn.get("description", ""),
-        "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-    }
-
-
 async def run_agent_loop(client, task_description, whiteboard_content="", user_memories="", on_step=None, replay_buffer=None, terminated=None, on_screenshot=None, on_checkpoint=None):
     """
-    Observe-think-act loop using the Anthropic Messages API.
+    Observe-think-act loop using the OpenAI-compatible Chat Completions API.
 
     Each turn:
-      1. Take a screenshot -> inject as an image block in a user message
-      2. Model sees the desktop and returns a tool_use block
-      3. Execute the tool, append tool_result, loop back to 1
+      1. Take a screenshot -> inject as an image_url in a user message
+      2. Model sees the desktop and returns a tool call
+      3. Execute the tool, loop back to 1
 
     Returns the final summary when the model calls 'done'.
     If `terminated` (asyncio.Event) is set, exits early.
     """
     system_content = SYSTEM_PROMPT
     if whiteboard_content:
-        system_content += (
-            f"\n\nShared whiteboard (written by other agents):\n{whiteboard_content}"
-        )
+        system_content += f"\n\nShared whiteboard (written by other agents):\n{whiteboard_content}"
     if user_memories:
         system_content += f"\n\n{user_memories}"
 
     messages = [
+        {"role": "system", "content": system_content},
         {"role": "user", "content": f"Your task: {task_description}"},
     ]
-    system = system_content
 
     last_action_label = "Starting task"
     no_tool_retries = 0
@@ -182,62 +183,49 @@ async def run_agent_loop(client, task_description, whiteboard_content="", user_m
         else:
             tools = desktop_tools.TOOL_SCHEMAS
 
-        anthropic_tools = [_openai_tool_to_anthropic(t) for t in tools]
-
         response = await call_with_retry(
             client,
             model=MODEL,
-            system=system,
             messages=messages,
-            tools=anthropic_tools,
-            tool_choice={"type": "auto"},
+            tools=tools,
+            tool_choice="auto",
             max_tokens=2048,
         )
 
-        msg = response.content
-        text_parts = [
-            block.text
-            for block in msg
-            if getattr(block, "type", None) == "text"
-        ]
-        tool_blocks = [
-            block
-            for block in msg
-            if getattr(block, "type", None) == "tool_use"
-        ]
-        reasoning = "\n".join(text_parts).strip() or None
+        choice = response.choices[0]
+        msg = choice.message
 
-        # Append assistant response (text + tool_use blocks)
-        assistant_blocks = []
-        for block in msg:
-            btype = getattr(block, "type", None)
-            if btype == "text":
-                assistant_blocks.append({"type": "text", "text": block.text})
-            elif btype == "tool_use":
-                assistant_blocks.append({
-                    "type": "tool_use",
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                })
-        messages.append({"role": "assistant", "content": assistant_blocks})
+        messages.append({
+            "role": "assistant",
+            "content": msg.content or "",
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in (msg.tool_calls or [])
+            ],
+        })
 
-        if not tool_blocks:
+        reasoning = (msg.content or "").strip() or None
+
+        if not msg.tool_calls:
             no_tool_retries += 1
             if no_tool_retries >= 3:
                 logger.error("Model returned no tool calls %d times, giving up", no_tool_retries)
-                return reasoning or "(model failed to call tools)"
+                return msg.content or "(model failed to call tools)"
             logger.warning("No tool calls in response at step %d (retry %d/3)", step, no_tool_retries)
-            messages.pop()  # assistant response
-            messages.pop()  # screenshot message
+            messages.pop()
+            messages.pop()
             continue
 
         no_tool_retries = 0
 
-        tb = tool_blocks[0]
-        name = tb.name
+        tc = msg.tool_calls[0]
+        name = tc.function.name
         try:
-            args = tb.input if isinstance(tb.input, dict) else json.loads(tb.input or "{}")
+            args = json.loads(tc.function.arguments)
         except json.JSONDecodeError:
             args = {}
 
@@ -249,20 +237,10 @@ async def run_agent_loop(client, task_description, whiteboard_content="", user_m
         result = desktop_tools.execute_tool(name, args)
 
         if name == "done":
-            messages.append({
-                "role": "user",
-                "content": [
-                    {"type": "tool_result", "tool_use_id": tb.id, "content": result}
-                ],
-            })
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
             return result
 
-        messages.append({
-            "role": "user",
-            "content": [
-                {"type": "tool_result", "tool_use_id": tb.id, "content": result}
-            ],
-        })
+        messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
     return "(max steps reached)"
 
@@ -362,8 +340,11 @@ async def main():
     # --- Init tools ---
     desktop_tools.init(desktop)
 
-    # --- Init Anthropic client ---
-    client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    # --- Init Featherless AI client ---
+    client = AsyncOpenAI(
+        api_key=os.environ.get("FEATHERLESS_API_KEY"),
+        base_url=FEATHERLESS_BASE_URL,
+    )
 
     # --- Replay buffer ---
     replay_buffer = ReplayBuffer()
