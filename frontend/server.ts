@@ -71,14 +71,11 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
-/** 5-minute idle shutdown timers, keyed by sessionId */
-const idleTimers = new Map<string, NodeJS.Timeout>();
 /** Safety timers for sessions being stopped, keyed by sessionId */
 const stopTimers = new Map<string, NodeJS.Timeout>();
 /** Sessions waiting for workers to finish cleanup before completing */
 const stoppingSessions = new Set<string>();
 
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const STOP_TIMEOUT_MS = 30 * 1000; // 30 seconds max wait for worker cleanup
 const SLACK_MILESTONE_THROTTLE_MS = 30_000; // Min 30s between Slack milestone posts per session
 
@@ -118,63 +115,6 @@ app.prepare().then(() => {
   }
 
   /**
-   * Start (or restart) the 5-minute idle shutdown timer for a session.
-   * When the timer fires, the session truly completes.
-   */
-  function startIdleTimer(sessionId: string): void {
-    // Clear any existing timer
-    clearIdleTimer(sessionId);
-
-    console.log(
-      `[server] Session ${sessionId} — starting 5-min idle shutdown timer`
-    );
-
-    const timer = setTimeout(() => {
-      idleTimers.delete(sessionId);
-      pauseSession(sessionId);
-    }, IDLE_TIMEOUT_MS);
-
-    idleTimers.set(sessionId, timer);
-  }
-
-  function clearIdleTimer(sessionId: string): void {
-    const existing = idleTimers.get(sessionId);
-    if (existing) {
-      clearTimeout(existing);
-      idleTimers.delete(sessionId);
-      console.log(
-        `[server] Session ${sessionId} — cleared idle shutdown timer`
-      );
-    }
-  }
-
-  /**
-   * Pause a session: set status to "paused", tell workers to stop (they'll pause sandboxes).
-   * The session remains resumable — visiting the URL will respawn workers.
-   */
-  function pauseSession(sessionId: string): void {
-    const session = getSession(sessionId);
-    if (!session || session.status === "completed" || session.status === "failed" || session.status === "paused") return;
-
-    const room = `session:${sessionId}`;
-    session.status = "paused";
-
-    // Tell workers to stop — they'll pause sandboxes in their finally block
-    io.to(room).emit("task:none");
-
-    // Notify dashboard
-    io.to("dashboard").emit("dashboard:session_updated", {
-      sessionId,
-      status: "paused" as const,
-      completedTasks: session.todos.filter((t) => t.status === "completed").length,
-      totalTasks: session.todos.length,
-    });
-
-    console.log(`[server] Session ${sessionId} — paused (idle timeout)`);
-    persistSessionStatus(sessionId, "paused").catch(console.error);
-  }
-
-  /**
    * Finalize a session: set status to completed, emit session:complete,
    * tell workers to stop, and persist.
    */
@@ -186,6 +126,7 @@ app.prepare().then(() => {
     session.status = "completed";
 
     io.to(room).emit("session:complete", { sessionId });
+    io.to(room).emit("session:stop", { sessionId });
     io.to(room).emit("task:none");
 
     // Notify dashboard
@@ -362,9 +303,6 @@ app.prepare().then(() => {
 
       console.log(`[socket.io] Stopping session ${sessionId}`);
 
-      // Clear any idle timer
-      clearIdleTimer(sessionId);
-
       // Track that this session is stopping — workers need time to save replays
       stoppingSessions.add(sessionId);
 
@@ -388,7 +326,6 @@ app.prepare().then(() => {
     socket.on("session:finish", (data: { sessionId: string }) => {
       const { sessionId } = data;
       console.log(`[socket.io] Finishing session ${sessionId}`);
-      clearIdleTimer(sessionId);
       finalizeSession(sessionId);
     });
 
@@ -401,9 +338,6 @@ app.prepare().then(() => {
       console.log(
         `[server] Session ${sessionId} — received follow-up: "${prompt}"`
       );
-
-      // Clear the idle timer since new work is coming
-      clearIdleTimer(sessionId);
 
       // Decompose the follow-up prompt
       try {
@@ -702,18 +636,18 @@ app.prepare().then(() => {
           whiteboard,
         });
       } else if (isSessionFullyComplete(sessionId)) {
-        // All tasks done — emit tasks_done, start idle timer
+        // All tasks done — close the worker after replay data is saved.
         const room = `session:${sessionId}`;
         io.to(room).emit("session:tasks_done", { sessionId });
         console.log(
-          `[server] Session ${sessionId} — all tasks completed, agents idling`
+          `[server] Session ${sessionId} — all tasks completed, shutting down agents`
         );
 
-        // Start 5-min idle timer (agents stay alive for follow-ups)
-        startIdleTimer(sessionId);
+        stoppingSessions.add(sessionId);
+        io.to(room).emit("session:stop", { sessionId });
+        io.to(room).emit("task:none");
 
-        // Post completion to Slack immediately and shut down workers
-        // so the GIF saves and uploads without waiting for the 5-min idle timer
+        // Post completion to Slack immediately while workers save their replays.
         const slackSession = getSlackSessionBySessionId(sessionId);
         if (slackSession) {
           const whiteboard = getWhiteboard(sessionId);
@@ -728,10 +662,16 @@ app.prepare().then(() => {
             console.error
           );
 
-          // Tell workers to shut down now — triggers finally block which saves GIF
-          clearIdleTimer(sessionId);
-          io.to(room).emit("task:none");
         }
+
+        const timeout = setTimeout(() => {
+          stopTimers.delete(sessionId);
+          if (stoppingSessions.has(sessionId)) {
+            console.log(`[server] Session ${sessionId} — completion shutdown timed out`);
+            completeStoppedSession(sessionId);
+          }
+        }, STOP_TIMEOUT_MS);
+        stopTimers.set(sessionId, timeout);
       }
       // Otherwise: no pending tasks but session not complete — agent idles
     });

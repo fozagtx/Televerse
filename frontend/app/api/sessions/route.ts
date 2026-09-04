@@ -42,6 +42,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!process.env.E2B_API_KEY) {
+    return NextResponse.json(
+      { error: "E2B_API_KEY is not configured on the server" },
+      { status: 503 },
+    );
+  }
+
   const maxAgents = await getMaxAgentsForUser("dev-user");
   if (agentCount > maxAgents) {
     return NextResponse.json(
