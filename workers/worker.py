@@ -57,7 +57,13 @@ class DaytonaDesktop:
 
     @staticmethod
     def _image_bytes(response):
-        image = getattr(response, "image", None) or getattr(response, "data", None)
+        image = (
+            getattr(response, "screenshot", None)
+            or getattr(response, "image", None)
+            or getattr(response, "data", None)
+        )
+        if image is None:
+            raise RuntimeError("Daytona returned an empty screenshot")
         if isinstance(image, str):
             return base64.b64decode(image)
         return bytes(image)
