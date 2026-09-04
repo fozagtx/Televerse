@@ -22,6 +22,12 @@ export function WebMcpProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const retryMount = () => {
+      attempts += 1;
+      if (attempts <= 10) retryTimer = setTimeout(mount, 1000);
+    };
     async function mount() {
       if (status === "loading") return;
       if (status !== "authenticated" || !session?.user) {
@@ -33,6 +39,9 @@ export function WebMcpProvider({ children }: { children: React.ReactNode }) {
           const result = await mountAllTools();
           if (cancelled) return;
           setCtx({ state: "ready", result, error: null });
+          if (result.devMode && !document.modelContext) {
+            retryMount();
+          }
         } catch (err) {
           if (cancelled) return;
           setCtx({
@@ -48,6 +57,9 @@ export function WebMcpProvider({ children }: { children: React.ReactNode }) {
         const result = await mountAllTools();
         if (cancelled) return;
         setCtx({ state: "ready", result, error: null });
+        if (result.devMode && !document.modelContext) {
+          retryMount();
+        }
       } catch (err) {
         if (cancelled) return;
         setCtx({
@@ -60,6 +72,7 @@ export function WebMcpProvider({ children }: { children: React.ReactNode }) {
     mount();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [session, status]);
 

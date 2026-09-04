@@ -31,7 +31,7 @@ export function AgentGrid({
       ? "grid-cols-1"
       : agents.length <= 2
         ? "grid-cols-2"
-        : "grid-cols-2";
+    : "grid-cols-1 sm:grid-cols-2";
 
   return (
     <div className={cn("grid h-full gap-2 p-2", gridCols)}>
@@ -93,10 +93,10 @@ function AgentGridCell({
             className={cn(
               "size-1.5 rounded-full shrink-0",
               agent.status === "active"
-                ? "bg-emerald-400"
+                ? "bg-foreground"
                 : agent.status === "terminated"
                   ? "bg-zinc-600"
-                  : "bg-amber-400 animate-pulse"
+                  : "bg-muted-foreground animate-pulse"
             )}
           />
           <span className="text-[10px] font-medium text-white">

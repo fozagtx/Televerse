@@ -35,10 +35,10 @@ function getAgentIndex(agentId: string, agents: Agent[]): number {
 }
 
 function getAgentColor(index: number) {
-  const hue = (index * 90) % 360;
+  const shade = Math.max(28, 72 - index * 12);
   return {
-    bg: `hsl(${hue} 70% 60% / 0.15)`,
-    text: `hsl(${hue} 70% 60%)`,
+    bg: `hsl(0 0% ${shade}% / 0.15)`,
+    text: `hsl(0 0% ${shade}%)`,
   };
 }
 

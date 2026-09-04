@@ -107,12 +107,12 @@ export async function mountAllTools(
     return { registered: [], devMode: false };
   }
   const globalAny = globalThis as unknown as Record<string, unknown>;
-  if (globalAny[ACTIVE_KEY]) {
-    const cached = globalAny[ACTIVE_KEY] as MountResult;
+  const cached = globalAny[ACTIVE_KEY] as MountResult | undefined;
+  if (cached && (!document.modelContext || !cached.devMode)) {
     return cached;
   }
 
-  const result: MountResult = {
+  const result: MountResult = cached ?? {
     registered: [],
     devMode: !document.modelContext,
   };
@@ -120,7 +120,7 @@ export async function mountAllTools(
   const registry = getRegistry();
   for (const tool of allTools) {
     registry.tools.set(tool.name, { definition: tool, source: "dev" });
-    result.registered.push(tool.name);
+    if (!result.registered.includes(tool.name)) result.registered.push(tool.name);
 
     if (document.modelContext) {
       try {
@@ -147,6 +147,7 @@ export async function mountAllTools(
     });
   }
 
+  result.devMode = !document.modelContext;
   globalAny[ACTIVE_KEY] = result;
   return result;
 }
