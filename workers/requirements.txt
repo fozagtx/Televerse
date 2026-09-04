@@ -1,4 +1,4 @@
-daytona
+e2b-desktop
 openai
 Pillow
 imageio

@@ -8,12 +8,12 @@ import time
 from io import BytesIO
 
 import socketio
-from daytona import Daytona, DaytonaConfig
+from e2b_desktop import Sandbox
 from openai import AsyncOpenAI
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
-import daytona_tools as desktop_tools
+import e2b_tools as desktop_tools
 from memory import MemoryManager
 from replay import ReplayBuffer
 
@@ -45,10 +45,6 @@ HISTORY_KEEP_RECENT = 10
 THUMBNAIL_INTERVAL_SECONDS = 10
 MIN_STEPS_BEFORE_DONE = 3
 CHECKPOINT_INTERVAL = 100
-COMPUTER_USE_STATUS_RETRIES = 10
-COMPUTER_USE_STATUS_RETRY_DELAY = 2
-STREAM_PREVIEW_RETRIES = 6
-STREAM_PREVIEW_RETRY_DELAY = 2
 
 
 def make_screenshot_message():
@@ -59,82 +55,6 @@ def make_screenshot_message():
         "content": f"Here is the current screenshot. The agent loop is running. What action should you take next?",
     }
     return msg, raw_bytes
-
-
-async def get_stream_url(desktop):
-    """Wait for the sandbox's noVNC port to become available.
-
-    Sandbox creation and the desktop service startup are asynchronous. A
-    single get_preview_link call can therefore race the service and return no
-    URL, leaving the browser stuck in its boot state forever.
-    """
-    for attempt in range(STREAM_PREVIEW_RETRIES):
-        try:
-            preview = desktop.get_preview_link(6080)
-            url = getattr(preview, "url", None)
-            if url:
-                return url
-        except Exception as exc:
-            logger.info(
-                "Waiting for noVNC preview (attempt %d/%d): %s",
-                attempt + 1,
-                STREAM_PREVIEW_RETRIES,
-                exc,
-            )
-        if attempt < STREAM_PREVIEW_RETRIES - 1:
-            await asyncio.sleep(STREAM_PREVIEW_RETRY_DELAY)
-    return None
-
-
-def is_computer_use_ready(status):
-    """Return true when Daytona reports the desktop/VNC processes are running."""
-    status_text = json.dumps(status, default=str).lower()
-    if not any(value in status_text for value in ("ready", "running", "started")):
-        return False
-    return not any(value in status_text for value in ("error", "failed", "stopped", "stopping"))
-
-
-async def start_computer_use(desktop):
-    """Start and wait briefly for Daytona desktop processes before streaming."""
-    await asyncio.to_thread(desktop.computer_use.start)
-
-    for attempt in range(COMPUTER_USE_STATUS_RETRIES):
-        try:
-            response = await asyncio.to_thread(desktop.computer_use.get_status)
-            status = getattr(response, "status", response)
-            if is_computer_use_ready(status):
-                return True
-            logger.info(
-                "Waiting for computer-use status (attempt %d/%d): %s",
-                attempt + 1,
-                COMPUTER_USE_STATUS_RETRIES,
-                status,
-            )
-        except Exception as exc:
-            logger.info(
-                "Waiting for computer-use status (attempt %d/%d): %s",
-                attempt + 1,
-                COMPUTER_USE_STATUS_RETRIES,
-                exc,
-            )
-        if attempt < COMPUTER_USE_STATUS_RETRIES - 1:
-            await asyncio.sleep(COMPUTER_USE_STATUS_RETRY_DELAY)
-
-    return False
-
-
-def create_daytona_client():
-    api_key = os.environ.get("DAYTONA_API_KEY")
-    if not api_key:
-        raise RuntimeError("DAYTONA_API_KEY is not configured; cannot create a Daytona sandbox")
-
-    return Daytona(
-        DaytonaConfig(
-            api_key=api_key,
-            api_url=os.environ.get("DAYTONA_API_URL", "https://app.daytona.io/api"),
-            target=os.environ.get("DAYTONA_TARGET", "us"),
-        )
-    )
 
 
 async def call_with_retry(client, **kwargs):
@@ -361,37 +281,24 @@ async def main():
     async def on_checkpoint_resume(data=None):
         checkpoint_resume.set()
 
-    # --- Boot or reconnect Daytona sandbox ---
+    # --- Boot or reconnect E2B sandbox ---
     desktop = None
     reconnect_sandbox_id = os.environ.get("SANDBOX_ID")
     try:
-        daytona_client = create_daytona_client()
         if reconnect_sandbox_id:
             logger.info("Reconnecting to sandbox %s", reconnect_sandbox_id)
-            desktop = daytona_client.get(reconnect_sandbox_id)
-            desktop.start()
-            computer_use_ready = await start_computer_use(desktop)
-            if not computer_use_ready:
-                logger.warning("Computer-use status did not become ready before preview lookup")
-            stream_url = await get_stream_url(desktop)
-            if stream_url:
-                await emit("agent:stream_ready", {"streamUrl": stream_url})
-            else:
-                await emit("agent:error", {"error": "Sandbox desktop stream did not become available"})
+            desktop = Sandbox(sandbox_id=reconnect_sandbox_id, timeout=3600)
+            desktop.stream.start()
+            stream_url = desktop.stream.get_url()
+            await emit("agent:stream_ready", {"streamUrl": stream_url})
             logger.info("Reconnected to sandbox %s, stream at %s", reconnect_sandbox_id, stream_url)
         else:
-            desktop = daytona_client.create()
-            computer_use_ready = await start_computer_use(desktop)
-            if not computer_use_ready:
-                logger.warning("Computer-use status did not become ready before preview lookup")
-            desktop.set_auto_delete_interval(0)
-            stream_url = await get_stream_url(desktop)
-            await emit("agent:sandbox_ready", {"sandboxId": desktop.id})
-            if stream_url:
-                await emit("agent:stream_ready", {"streamUrl": stream_url})
-            else:
-                await emit("agent:error", {"error": "Sandbox desktop stream did not become available"})
-            logger.info("Sandbox booted (id=%s), stream at %s", desktop.id, stream_url)
+            desktop = Sandbox.create(timeout=3600)
+            desktop.stream.start()
+            stream_url = desktop.stream.get_url()
+            await emit("agent:sandbox_ready", {"sandboxId": desktop.sandbox_id})
+            await emit("agent:stream_ready", {"streamUrl": stream_url})
+            logger.info("Sandbox booted (id=%s), stream at %s", desktop.sandbox_id, stream_url)
     except Exception as e:
         logger.error("Failed to boot/reconnect sandbox: %s", e)
         if reconnect_sandbox_id:
@@ -620,20 +527,20 @@ async def main():
             except Exception as e:
                 logger.error("Failed to save replay: %s", e)
 
-        # Decide whether to stop or delete the sandbox
+        # Decide whether to pause or kill the sandbox
         if desktop:
             if force_kill:
-                desktop.delete()
-                logger.info("Sandbox deleted (user-initiated stop)")
+                desktop.kill()
+                logger.info("Sandbox killed (user-initiated stop)")
             else:
                 try:
-                    desktop.stop()
-                    await emit("agent:paused", {"sandboxId": desktop.id})
-                    logger.info("Sandbox stopped (id=%s)", desktop.id)
+                    desktop.pause()
+                    await emit("agent:paused", {"sandboxId": desktop.sandbox_id})
+                    logger.info("Sandbox paused (id=%s)", desktop.sandbox_id)
                 except Exception as e:
-                    logger.warning("Failed to stop sandbox, deleting instead: %s", e)
+                    logger.warning("Failed to pause sandbox, killing instead: %s", e)
                     try:
-                        desktop.delete()
+                        desktop.kill()
                     except Exception:
                         pass
         await emit("agent:terminated", {})

@@ -94,7 +94,7 @@ export function spawnWorkers(sessionId: string, agentCount: number): void {
 SOCKET_URL: process.env.WORKER_SOCKET_URL || `http://localhost:${process.env.PORT || "3000"}`,
 FEATHERLESS_API_KEY: process.env.FEATHERLESS_API_KEY || "",
         FEATHERLESS_MODEL: process.env.FEATHERLESS_MODEL || "zai-org/GLM-5.3",
-        DAYTONA_API_KEY: process.env.DAYTONA_API_KEY || "",
+E2B_API_KEY: process.env.E2B_API_KEY || "",
         // Panopticon: Enable long-running mode for Panopticon sessions
         PANOPTICON_MODE: session.isPanopticon ? "true" : "false",
         // Slack: enable step checkpoints when running from a Slack session

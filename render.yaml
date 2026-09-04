@@ -18,10 +18,8 @@ services:
         value: https://televerse-egjd.onrender.com
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: DAYTONA_API_KEY
+      - key: E2B_API_KEY
         sync: false
-      - key: DAYTONA_TARGET
-        value: us
       - key: PYTHON_PATH
         value: /app/.venv/bin/python3
       - key: PROJECT_ROOT
