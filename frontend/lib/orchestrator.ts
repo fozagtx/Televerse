@@ -1,5 +1,5 @@
 /**
- * Orchestrator — task decomposition via the Anthropic Messages API.
+ * Orchestrator — task decomposition via the Featherless AI API.
  *
  * Given a user prompt, breaks it into granular, lane-grouped tasks
  * that Televerse agents can execute in parallel.
@@ -12,8 +12,9 @@ interface DecomposedTask {
 
 export type { DecomposedTask };
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.DEDALUS_API_KEY || "";
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const FEATHERLESS_API_KEY = process.env.FEATHERLESS_API_KEY || "";
+const FEATHERLESS_API_URL = "https://api.featherless.ai/v1/chat/completions";
+const FEATHERLESS_MODEL = process.env.FEATHERLESS_MODEL || "zai-org/GLM-5.3";
 
 const SYSTEM_PROMPT = `You are a JSON API that breaks user requests into small, simple, granular tasks grouped into parallel lanes. You respond with raw JSON only, never natural language.
 
@@ -48,18 +49,17 @@ export async function decomposeTasks(
     ? `exactly ${taskCount}`
     : `as many as needed (minimum 1, maximum ${maxTasks})`;
 
-  const response = await fetch(ANTHROPIC_API_URL, {
+  const response = await fetch(FEATHERLESS_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${FEATHERLESS_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: FEATHERLESS_MODEL,
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
       messages: [
+        { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: `Break the following request into ${countInstruction} small, granular tasks grouped into lanes. Each task should be a simple, concrete action. Err on the side of more tasks — it's better to have 5 small todos than 2 big ones.
@@ -78,14 +78,11 @@ Tasks within the same lane will run in order. Different lanes run in parallel.`,
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Anthropic API error (${response.status}): ${text}`);
+    throw new Error(`Featherless API error (${response.status}): ${text}`);
   }
 
   const data = await response.json();
-  let text = "";
-  for (const block of data.content) {
-    if (block.type === "text") text += block.text;
-  }
+  let text = data.choices?.[0]?.message?.content || "";
 
   console.log("[orchestrator] Anthropic response:", text.substring(0, 500));
 
