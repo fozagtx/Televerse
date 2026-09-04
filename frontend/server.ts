@@ -337,14 +337,12 @@ app.prepare().then(() => {
           if (agent.streamUrl) {
             socket.emit("agent:stream_ready", {
               agentId: agent.id,
-              sessionId,
               streamUrl: agent.streamUrl,
             });
           }
           if (agent.status === "error" && agent.errorMessage) {
             socket.emit("agent:error", {
               agentId: agent.id,
-              sessionId,
               error: agent.errorMessage,
             });
           }

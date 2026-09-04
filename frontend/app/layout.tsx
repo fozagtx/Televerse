@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   title: "Televerse",
   description:
     "Teleport agents into isolated cloud desktops. Never stop coding to chase a rabbit hole.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
