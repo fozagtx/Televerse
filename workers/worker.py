@@ -241,9 +241,22 @@ async def main():
         format=f"[%(levelname)s] agent-{agent_id}: %(message)s",
     )
 
-    # --- Socket.io connection ---
+    # --- Socket.io connection with retry ---
     sio = socketio.AsyncClient()
-    await sio.connect(socket_url)
+    max_connect_retries = 10
+    connected = False
+    for attempt in range(max_connect_retries):
+        try:
+            await sio.connect(socket_url)
+            connected = True
+            break
+        except socketio.exceptions.ConnectionError as e:
+            logger.warning("Socket connect attempt %d/%d failed: %s", attempt + 1, max_connect_retries, e)
+            if attempt < max_connect_retries - 1:
+                await asyncio.sleep(2)
+    if not connected:
+        logger.error("Failed to connect to socket server at %s after %d attempts", socket_url, max_connect_retries)
+        return
 
     async def emit(event, data):
         await sio.emit(event, {"sessionId": session_id, "agentId": agent_id, **data})

@@ -25,5 +25,5 @@ services:
       - key: PROJECT_ROOT
         value: /app
       - key: WORKER_SOCKET_URL
-        value: http://localhost:3000
+        value: http://127.0.0.1:3000
     healthCheckPath: /
