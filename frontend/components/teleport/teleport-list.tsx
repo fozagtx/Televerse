@@ -35,17 +35,17 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  created: "bg-zinc-800 text-zinc-300",
-  context_captured: "bg-blue-900/50 text-blue-300",
-  provisioning: "bg-blue-900/50 text-blue-300",
-  running: "bg-green-900/50 text-green-300",
-  investigating: "bg-amber-900/50 text-amber-300",
-  testing: "bg-purple-900/50 text-purple-300",
-  completed: "bg-zinc-800 text-zinc-300",
-  failed: "bg-red-900/50 text-red-300",
-  cancelled: "bg-zinc-800 text-zinc-400",
-  reviewable: "bg-emerald-900/50 text-emerald-300",
-  discarded: "bg-zinc-800 text-zinc-500",
+  created: "bg-secondary text-secondary-foreground",
+  context_captured: "bg-blue-100 text-blue-700",
+  provisioning: "bg-blue-100 text-blue-700",
+  running: "bg-green-100 text-green-700",
+  investigating: "bg-amber-100 text-amber-700",
+  testing: "bg-purple-100 text-purple-700",
+  completed: "bg-secondary text-secondary-foreground",
+  failed: "bg-red-100 text-red-700",
+  cancelled: "bg-secondary text-muted-foreground",
+  reviewable: "bg-emerald-100 text-emerald-700",
+  discarded: "bg-secondary text-muted-foreground",
 };
 
 function statusIcon(status: string) {
@@ -108,7 +108,7 @@ export function TeleportList({ primarySessionId, onSelect, compact = false }: Te
 
   if (teleports.length === 0) {
     return (
-      <div className="py-4 text-center text-xs text-zinc-500">
+      <div className="py-4 text-center text-xs text-muted-foreground">
         No teleported agents yet. Use the Teleport modal to delegate a side task.
       </div>
     );
@@ -123,27 +123,27 @@ export function TeleportList({ primarySessionId, onSelect, compact = false }: Te
             if (onSelect) onSelect(t.id);
             else router.push(`/teleport/${t.id}`);
           }}
-          className={`w-full text-left rounded-lg border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/60 transition-colors ${
+          className={`w-full text-left rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors ${
             compact ? "p-2" : "p-3"
           }`}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-zinc-200 truncate">
+                <span className="text-xs font-medium text-foreground truncate">
                   {t.sideTask}
                 </span>
                 {t.patchApplied && (
                   <span className="text-[10px] text-emerald-400 whitespace-nowrap">Applied</span>
                 )}
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-500">
+              <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <span>{new Date(t.createdAt).toLocaleString()}</span>
                 <span>·</span>
                 <span>{t.returnMode}</span>
               </div>
             </div>
-            <div className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] ${STATUS_COLORS[t.status] ?? "bg-zinc-800 text-zinc-400"}`}>
+            <div className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] ${STATUS_COLORS[t.status] ?? "bg-secondary text-muted-foreground"}`}>
               {statusIcon(t.status)}
               <span>{STATUS_LABELS[t.status] ?? t.status}</span>
             </div>
@@ -203,20 +203,20 @@ export function TeleportModal({ open, onOpenChange, primarySessionId, onCreated 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl">
         {result ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-emerald-400">
               <CheckCircle className="size-5" />
               <h3 className="text-sm font-semibold">Teleport launched</h3>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-muted-foreground">
               An agent is now investigating in an isolated workspace. Your session is not interrupted.
             </p>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <div className="text-[10px] uppercase tracking-wide text-zinc-500">Teleport ID</div>
-              <div className="mt-1 font-mono text-xs text-zinc-200">{result.teleportId}</div>
+            <div className="rounded-lg border border-border bg-muted/50 p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Teleport ID</div>
+              <div className="mt-1 font-mono text-xs text-foreground">{result.teleportId}</div>
             </div>
             <div className="flex gap-2">
               <Button

@@ -190,12 +190,12 @@ export default function Home() {
                   "?"}
               </div>
             )}
-            <span className="hidden sm:inline text-sm text-zinc-400">
+            <span className="hidden sm:inline text-sm text-muted-foreground">
               {authSession.user.name || authSession.user.email}
             </span>
             <PlanBadge />
             <Link href="/panopticon" className="hidden sm:inline-flex">
-              <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-zinc-300 text-xs">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs">
                 Panopticon
               </Button>
             </Link>
@@ -203,7 +203,7 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-zinc-500 hover:text-zinc-300 text-xs"
+                className="text-muted-foreground hover:text-foreground text-xs"
               >
                 Pricing
               </Button>
@@ -216,7 +216,7 @@ export default function Home() {
                 setActiveSessionId(firstActive?.id ?? null);
                 setTeleportOpen(true);
               }}
-              className="gap-1.5 text-amber-500 hover:text-amber-400 text-xs"
+              className="gap-1.5 text-amber-600 hover:text-amber-500 text-xs"
             >
               <Zap className="size-3.5" />
               Teleport
@@ -225,7 +225,7 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={() => signOut()}
-              className="text-zinc-500 hover:text-zinc-300"
+              className="text-muted-foreground hover:text-foreground"
             >
               <LogOut className="size-4" />
             </Button>
@@ -256,29 +256,29 @@ export default function Home() {
           <div className="w-[400px] shrink-0 border-l border-border/50 bg-card/30 p-6 overflow-y-auto">
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-sm font-semibold text-zinc-300">
+                <h2 className="text-sm font-semibold text-foreground">
                   New Task
                 </h2>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Describe a complex task. AI agents will execute it on
                   cloud desktops in parallel.
                 </p>
               </div>
 
               {/* Input area */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-sm overflow-hidden transition-colors focus-within:border-zinc-700">
+              <div className="rounded-xl border border-border bg-card backdrop-blur-sm overflow-hidden transition-colors focus-within:border-ring">
                 <Textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Write a research paper on Google Docs about the rise of Daedalus Labs..."
-                  className="min-h-[128px] resize-none border-0 bg-transparent px-5 pt-4 pb-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:ring-0 leading-relaxed"
+                  className="min-h-[128px] resize-none border-0 bg-transparent px-5 pt-4 pb-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0 leading-relaxed"
                   disabled={isSubmitting}
                 />
 
-                <div className="flex items-center justify-between border-t border-zinc-800/50 px-4 py-3">
+                <div className="flex items-center justify-between border-t border-border px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-zinc-500 font-medium">
+                    <span className="text-xs text-muted-foreground font-medium">
                       Agents
                     </span>
                     <div className="flex gap-1">
@@ -303,10 +303,10 @@ export default function Home() {
                             }
                             className={`flex size-7 items-center justify-center rounded-md text-xs font-medium transition-all ${
                               isLocked
-                                ? "text-zinc-700 cursor-pointer hover:text-zinc-500"
+                                ? "text-muted-foreground cursor-pointer hover:text-foreground"
                                 : agentCount === n
                                   ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                                  : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             }`}
                           >
                             {isLocked ? (
@@ -326,7 +326,7 @@ export default function Home() {
                       size="sm"
                       onClick={handleDemoMode}
                       disabled={isSubmitting}
-                      className="text-zinc-400"
+                      className="text-muted-foreground"
                     >
                       Demo
                     </Button>
@@ -355,7 +355,7 @@ export default function Home() {
                   <button
                     key={example.label}
                     onClick={() => setPrompt(example.prompt)}
-                    className="rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 hover:bg-zinc-800/60 transition-all"
+                    className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-ring hover:bg-accent transition-all"
                   >
                     {example.label}
                   </button>
@@ -363,12 +363,12 @@ export default function Home() {
               </div>
 
               {/* Keyboard hint */}
-              <p className="text-xs text-zinc-600">
-                <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
+              <p className="text-xs text-muted-foreground">
+                <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {"\u2318"}
                 </kbd>
                 <span className="mx-1">+</span>
-                <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
+                <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {"\u21B5"}
                 </kbd>
                 <span className="ml-1.5">to launch</span>
@@ -389,7 +389,7 @@ export default function Home() {
           <div className="w-[400px] shrink-0 border-l border-border/50 bg-card/30 p-6 overflow-y-auto">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-zinc-300">
+                <h2 className="text-sm font-semibold text-foreground">
                   Teleported Agents
                 </h2>
                 <button
@@ -398,13 +398,13 @@ export default function Home() {
                     setActiveSessionId(firstActive?.id ?? null);
                     setTeleportOpen(true);
                   }}
-                  className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-400"
+                  className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-500"
                 >
                   <Zap className="size-3" />
                   New
                 </button>
               </div>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 Side tasks delegated to isolated agents. Your session continues uninterrupted.
               </p>
               <TeleportList compact />
