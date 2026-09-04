@@ -1,0 +1,5 @@
+daytona
+Pillow
+imageio
+numpy
+python-socketio[asyncio_client]>=5.0.0

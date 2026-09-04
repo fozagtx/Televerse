@@ -1,0 +1,602 @@
+import asyncio
+import base64
+import json
+import logging
+import os
+import sys
+import time
+from io import BytesIO
+
+import socketio
+from daytona import Daytona
+from PIL import Image
+
+sys.path.insert(0, os.path.dirname(__file__))
+import e2b_tools as desktop_tools
+from memory import MemoryManager
+from replay import ReplayBuffer
+
+logger = logging.getLogger(__name__)
+
+MODEL = None
+MAX_STEPS = 500
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 2
+HISTORY_KEEP_RECENT = 10
+THUMBNAIL_INTERVAL_SECONDS = 10
+MIN_STEPS_BEFORE_DONE = 3
+CHECKPOINT_INTERVAL = 100
+
+
+def make_screenshot_message():
+    """Capture the desktop and return (message_dict, raw_png_bytes)."""
+    raw_bytes = desktop_tools.screenshot_raw_bytes()
+
+    img = Image.open(BytesIO(raw_bytes))
+    jpeg_buf = BytesIO()
+    img.save(jpeg_buf, format="JPEG", quality=75)
+    jpeg_b64 = base64.b64encode(jpeg_buf.getvalue()).decode("utf-8")
+
+    msg = {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Here is the current screenshot of the desktop:"},
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": jpeg_b64,
+                },
+            },
+            {"type": "text", "text": "What action should you take next?"},
+        ],
+    }
+    return msg, raw_bytes
+
+
+async def call_with_retry(client, **kwargs):
+    """Call client.messages.create() with exponential backoff on failure."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return await client.messages.create(**kwargs)
+        except Exception as e:
+            if attempt == MAX_RETRIES - 1:
+                raise
+            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            logger.warning(
+                "API error (attempt %d/%d): %s — retrying in %ds",
+                attempt + 1, MAX_RETRIES, e, delay,
+            )
+            await asyncio.sleep(delay)
+
+
+def trim_message_history(messages):
+    """Keep the task message and only the last N exchanges.
+
+    Anthropic pattern: user (screenshot) -> assistant (tool_use) -> user (tool_result).
+    Each group of 3 is one exchange. Older exchanges are replaced by a summary.
+    """
+    prefix_len = 1  # task message only
+    body = messages[prefix_len:]
+    exchange_size = 3
+    keep_count = HISTORY_KEEP_RECENT * exchange_size
+
+    if len(body) <= keep_count:
+        return
+
+    old_part = body[: len(body) - keep_count]
+    recent_part = body[len(body) - keep_count:]
+
+    summaries = []
+    for msg in old_part:
+        role = msg.get("role", "")
+        content = msg.get("content", [])
+        if isinstance(content, str):
+            continue
+        if role == "assistant":
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    summaries.append(f"- {block.get('name', '?')}({json.dumps(block.get('input', {}))})")
+        elif role == "user":
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    result_content = block.get("content", "")
+                    if result_content:
+                        summaries.append(f"  -> {str(result_content)[:120]}")
+
+    summary_text = (
+        f"[History summary: you already performed {len(old_part) // exchange_size} "
+        f"actions on this task. Recent actions:\n"
+        + "\n".join(summaries[-20:])
+        + "\n]"
+    )
+
+    messages[prefix_len:] = [
+        {"role": "user", "content": summary_text},
+    ] + recent_part
+
+
+def _openai_tool_to_anthropic(tool_schema):
+    """Convert an OpenAI-format tool schema to Anthropic format."""
+    fn = tool_schema.get("function", tool_schema)
+    return {
+        "name": fn["name"],
+        "description": fn.get("description", ""),
+        "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+    }
+
+
+async def run_agent_loop(client, task_description, whiteboard_content="", user_memories="", on_step=None, replay_buffer=None, terminated=None, on_screenshot=None, on_checkpoint=None):
+    """
+    Observe-think-act loop using the Anthropic Messages API.
+
+    Each turn:
+      1. Take a screenshot -> inject as an image block in a user message
+      2. Model sees the desktop and returns a tool_use block
+      3. Execute the tool, append tool_result, loop back to 1
+
+    Returns the final summary when the model calls 'done'.
+    If `terminated` (asyncio.Event) is set, exits early.
+    """
+    system_content = SYSTEM_PROMPT
+    if whiteboard_content:
+        system_content += (
+            f"\n\nShared whiteboard (written by other agents):\n{whiteboard_content}"
+        )
+    if user_memories:
+        system_content += f"\n\n{user_memories}"
+
+    messages = [
+        {"role": "user", "content": f"Your task: {task_description}"},
+    ]
+    system = system_content
+
+    last_action_label = "Starting task"
+    no_tool_retries = 0
+    raw_png = None
+
+    for step in range(MAX_STEPS):
+        if terminated is not None and terminated.is_set():
+            logger.info("Terminated during task at step %d", step)
+            return "(terminated by user)"
+
+        if on_checkpoint and step > 0 and step % CHECKPOINT_INTERVAL == 0:
+            result = await on_checkpoint(step, raw_png)
+            if result == "terminated":
+                return "(terminated by user at checkpoint)"
+
+        trim_message_history(messages)
+
+        screenshot_msg, raw_png = make_screenshot_message()
+        messages.append(screenshot_msg)
+
+        if replay_buffer is not None:
+            replay_buffer.capture_frame(raw_png, last_action_label)
+
+        if on_screenshot is not None:
+            await on_screenshot(raw_png)
+
+        if step < MIN_STEPS_BEFORE_DONE:
+            tools = [t for t in desktop_tools.TOOL_SCHEMAS if t["function"]["name"] != "done"]
+        else:
+            tools = desktop_tools.TOOL_SCHEMAS
+
+        anthropic_tools = [_openai_tool_to_anthropic(t) for t in tools]
+
+        response = await call_with_retry(
+            client,
+            model=MODEL,
+            system=system,
+            messages=messages,
+            tools=anthropic_tools,
+            tool_choice={"type": "auto"},
+            max_tokens=2048,
+        )
+
+        msg = response.content
+        text_parts = [
+            block.text
+            for block in msg
+            if getattr(block, "type", None) == "text"
+        ]
+        tool_blocks = [
+            block
+            for block in msg
+            if getattr(block, "type", None) == "tool_use"
+        ]
+        reasoning = "\n".join(text_parts).strip() or None
+
+        # Append assistant response (text + tool_use blocks)
+        assistant_blocks = []
+        for block in msg:
+            btype = getattr(block, "type", None)
+            if btype == "text":
+                assistant_blocks.append({"type": "text", "text": block.text})
+            elif btype == "tool_use":
+                assistant_blocks.append({
+                    "type": "tool_use",
+                    "id": block.id,
+                    "name": block.name,
+                    "input": block.input,
+                })
+        messages.append({"role": "assistant", "content": assistant_blocks})
+
+        if not tool_blocks:
+            no_tool_retries += 1
+            if no_tool_retries >= 3:
+                logger.error("Model returned no tool calls %d times, giving up", no_tool_retries)
+                return reasoning or "(model failed to call tools)"
+            logger.warning("No tool calls in response at step %d (retry %d/3)", step, no_tool_retries)
+            messages.pop()  # assistant response
+            messages.pop()  # screenshot message
+            continue
+
+        no_tool_retries = 0
+
+        tb = tool_blocks[0]
+        name = tb.name
+        try:
+            args = tb.input if isinstance(tb.input, dict) else json.loads(tb.input or "{}")
+        except json.JSONDecodeError:
+            args = {}
+
+        if on_step:
+            await on_step(step + 1, name, args, reasoning)
+
+        last_action_label = f"Tool: {name}"
+
+        result = desktop_tools.execute_tool(name, args)
+
+        if name == "done":
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": tb.id, "content": result}
+                ],
+            })
+            return result
+
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": tb.id, "content": result}
+            ],
+        })
+
+    return "(max steps reached)"
+
+
+async def main():
+    session_id = os.environ["SESSION_ID"]
+    agent_id = os.environ["AGENT_ID"]
+    user_id = os.environ.get("USER_ID")
+    socket_url = os.environ.get("SOCKET_URL", "http://localhost:3000")
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format=f"[%(levelname)s] agent-{agent_id}: %(message)s",
+    )
+
+    # --- Socket.io connection ---
+    sio = socketio.AsyncClient()
+    await sio.connect(socket_url)
+
+    async def emit(event, data):
+        await sio.emit(event, {"sessionId": session_id, "agentId": agent_id, **data})
+
+    # Join session room
+    await emit("agent:join", {})
+
+    # --- Register event handlers BEFORE booting sandbox ---
+    task_queue = asyncio.Queue()
+    terminated = asyncio.Event()
+    force_kill = False
+
+    @sio.on("task:assign")
+    async def on_task_assign(data):
+        await task_queue.put(data)
+
+    @sio.on("task:none")
+    async def on_task_none(data=None):
+        terminated.set()
+
+    @sio.on("session:stop")
+    async def on_session_stop(data=None):
+        nonlocal force_kill
+        force_kill = True
+        terminated.set()
+
+    @sio.on("session:complete")
+    async def on_session_complete(data=None):
+        terminated.set()
+
+    # Checkpoint resume signal (Slack user clicked Continue)
+    checkpoint_resume = asyncio.Event()
+
+    @sio.on("session:checkpoint_resume")
+    async def on_checkpoint_resume(data=None):
+        checkpoint_resume.set()
+
+    # --- Boot or reconnect Daytona sandbox ---
+    desktop = None
+    daytona_client = Daytona()
+    reconnect_sandbox_id = os.environ.get("SANDBOX_ID")
+    try:
+        if reconnect_sandbox_id:
+            logger.info("Reconnecting to sandbox %s", reconnect_sandbox_id)
+            desktop = daytona_client.get(reconnect_sandbox_id)
+            desktop.start()
+            desktop.computer_use.start()
+            # Get a noVNC preview URL for the browser stream
+            try:
+                preview = desktop.get_preview_link(6080)
+                stream_url = preview.url
+            except Exception:
+                stream_url = None
+            if stream_url:
+                await emit("agent:stream_ready", {"streamUrl": stream_url})
+            logger.info("Reconnected to sandbox %s, stream at %s", reconnect_sandbox_id, stream_url)
+        else:
+            desktop = daytona_client.create()
+            desktop.computer_use.start()
+            desktop.set_auto_delete_interval(0)
+            try:
+                preview = desktop.get_preview_link(6080)
+                stream_url = preview.url
+            except Exception:
+                stream_url = None
+            await emit("agent:sandbox_ready", {"sandboxId": desktop.id})
+            if stream_url:
+                await emit("agent:stream_ready", {"streamUrl": stream_url})
+            logger.info("Sandbox booted (id=%s), stream at %s", desktop.id, stream_url)
+    except Exception as e:
+        logger.error("Failed to boot/reconnect sandbox: %s", e)
+        if reconnect_sandbox_id:
+            await emit("agent:sandbox_expired", {})
+        else:
+            await emit("agent:error", {"error": str(e)})
+        await sio.disconnect()
+        return
+
+    # --- Init tools ---
+    desktop_tools.init(desktop)
+
+    # --- Init Anthropic client ---
+    client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+    # --- Replay buffer ---
+    replay_buffer = ReplayBuffer()
+    r2_public_url = os.environ.get("R2_PUBLIC_URL", "")
+    _last_thumbnail_time = 0.0
+
+    # --- Memory manager (per-user, opt-in via ENABLE_MEMORY env var) ---
+    memory_mgr = MemoryManager() if user_id and os.environ.get("ENABLE_MEMORY") else None
+
+    # --- Heartbeat background task ---
+    async def heartbeat_loop():
+        while not terminated.is_set():
+            try:
+                await emit("agent:heartbeat", {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+            except Exception:
+                pass
+            await asyncio.sleep(30)
+
+    heartbeat_task = asyncio.create_task(heartbeat_loop())
+
+    # --- Thumbnail generation for Panopticon ---
+    thumbnail_task = None
+
+    async def generate_thumbnails():
+        """Periodically capture and emit thumbnail screenshots for Panopticon."""
+        while not terminated.is_set():
+            try:
+                # Take screenshot for thumbnail
+                raw_bytes = desktop_tools.screenshot_raw_bytes()
+
+                # Create smaller thumbnail (300x200 max)
+                img = Image.open(BytesIO(raw_bytes))
+                img.thumbnail((300, 200), Image.Resampling.LANCZOS)
+
+                # Convert to JPEG and base64
+                thumbnail_buf = BytesIO()
+                img.save(thumbnail_buf, format="JPEG", quality=60)
+                thumbnail_b64 = base64.b64encode(thumbnail_buf.getvalue()).decode("utf-8")
+
+                # Emit thumbnail update
+                await emit("agent:thumbnail", {
+                    "thumbnail": thumbnail_b64,
+                    "timestamp": int(asyncio.get_event_loop().time() * 1000)
+                })
+
+                # Wait 10 seconds before next thumbnail
+                await asyncio.sleep(10)
+
+            except Exception as e:
+                logger.warning("Failed to generate thumbnail: %s", e)
+                await asyncio.sleep(5)  # Shorter delay on error
+
+    # Start thumbnail generation task for Panopticon sessions
+    is_panopticon = os.environ.get("PANOPTICON_MODE", "false").lower() == "true"
+    if is_panopticon and os.environ.get("ENABLE_THUMBNAILS", "true").lower() == "true":
+        thumbnail_task = asyncio.create_task(generate_thumbnails())
+
+    try:
+        while not terminated.is_set():
+            # Wait for a task or termination signal
+            try:
+                task_data = await asyncio.wait_for(task_queue.get(), timeout=2.0)
+            except asyncio.TimeoutError:
+                if terminated.is_set():
+                    break
+                continue
+
+            task_id = task_data["taskId"]
+            task_description = task_data["description"]
+            whiteboard_content = task_data.get("whiteboard", "")
+
+            await emit(
+                "agent:thinking",
+                {"action": "Starting task", "detail": task_description},
+            )
+            logger.info("Starting task %s: %s", task_id, task_description)
+
+            # Retrieve user memories for context
+            user_memories = ""
+            if memory_mgr and user_id:
+                user_memories = await asyncio.to_thread(
+                    memory_mgr.retrieve_memories, user_id, task_description
+                )
+
+            async def on_step(step, name, args, reasoning=None):
+                logger.info("  Step %d: %s(%s)", step, name, args)
+                action_id = f"{agent_id}-{step}-{task_id}"
+                # Emit reasoning BEFORE thinking so the server can attach it
+                # to the buffered action before the throttle fires
+                if reasoning:
+                    await emit("agent:reasoning", {
+                        "reasoning": reasoning,
+                        "actionId": action_id,
+                    })
+                await emit("agent:thinking", {
+                    "action": f"Tool: {name}",
+                    "actionId": action_id,
+                    "toolName": name,
+                    "toolArgs": args,
+                })
+
+            async def on_screenshot(raw_png):
+                nonlocal _last_thumbnail_time
+                now = time.monotonic()
+                if now - _last_thumbnail_time >= THUMBNAIL_INTERVAL_SECONDS:
+                    _last_thumbnail_time = now
+                    try:
+                        thumb = ReplayBuffer.make_thumbnail(raw_png)
+                        await emit("agent:thumbnail", {"thumbnail": thumb})
+                    except Exception as e:
+                        logger.warning("Failed to emit thumbnail: %s", e)
+
+            # Checkpoint callback — only active for Slack sessions
+            is_slack_session = os.environ.get("SLACK_SESSION") == "true"
+
+            async def on_checkpoint(step, raw_png):
+                """Emit checkpoint event and block until user responds."""
+                thumb = ReplayBuffer.make_thumbnail(raw_png) if raw_png else None
+                await emit("agent:checkpoint", {
+                    "step": step,
+                    "totalSteps": MAX_STEPS,
+                    "thumbnail": thumb,
+                })
+                logger.info("Checkpoint at step %d — waiting for user", step)
+                checkpoint_resume.clear()
+                while not checkpoint_resume.is_set() and not terminated.is_set():
+                    await asyncio.sleep(1.0)
+                if terminated.is_set():
+                    return "terminated"
+                return "continue"
+
+            try:
+                result = await run_agent_loop(
+                    client, task_description,
+                    whiteboard_content=whiteboard_content,
+                    user_memories=user_memories,
+                    on_step=on_step,
+                    replay_buffer=replay_buffer,
+                    terminated=terminated,
+                    on_screenshot=on_screenshot,
+                    on_checkpoint=on_checkpoint if is_slack_session else None,
+                )
+            except (ConnectionError, TimeoutError, OSError) as e:
+                # Daytona sandbox connection lost
+                logger.error("Sandbox connection lost during task %s: %s", task_id, e)
+                await emit("agent:sandbox_expired", {})
+                terminated.set()
+                result = f"(sandbox expired: {e})"
+            except Exception as e:
+                result = f"Error: {e}"
+                await emit(
+                    "agent:error",
+                    {"error": str(e)},
+                )
+                logger.error("Task %s failed: %s", task_id, e)
+
+            # Report task completion
+            await emit(
+                "task:completed", {"todoId": task_id, "result": result}
+            )
+            logger.info("Completed task %s", task_id)
+
+            # Store memories from successful tasks
+            if memory_mgr and user_id and result and not result.startswith("("):
+                await asyncio.to_thread(
+                    memory_mgr.store_memories, user_id, task_description, result
+                )
+
+            # Write result to whiteboard
+            await emit(
+                "whiteboard:updated",
+                {"content": f"## Agent {agent_id[:6]} - Task Complete\n{result}\n\n"},
+            )
+
+    finally:
+        # Cancel heartbeat
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+
+        # Save/upload replay frames before killing sandbox
+        if replay_buffer.frame_count > 0:
+            try:
+                if r2_public_url:
+                    # R2 mode: upload via presigned URLs
+                    upload_result = await replay_buffer.upload_r2(
+                        session_id, agent_id, socket_url, r2_public_url
+                    )
+                else:
+                    # Local mode: save to disk, serve via API route
+                    replay_dir = os.environ.get(
+                        "REPLAY_DIR",
+                        os.path.join(os.path.dirname(__file__), "..", "frontend", ".replays"),
+                    )
+                    serve_base = f"{socket_url}/api/replay/serve"
+                    upload_result = replay_buffer.save_local(
+                        session_id, agent_id, replay_dir, serve_base
+                    )
+
+                if upload_result:
+                    manifest_url, frame_count = upload_result
+                    await emit("replay:complete", {
+                        "manifestUrl": manifest_url,
+                        "frameCount": frame_count,
+                    })
+                    logger.info("Replay saved: %d frames", frame_count)
+            except Exception as e:
+                logger.error("Failed to save replay: %s", e)
+
+        # Decide whether to stop or delete the sandbox
+        if desktop:
+            if force_kill:
+                desktop.delete()
+                logger.info("Sandbox deleted (user-initiated stop)")
+            else:
+                try:
+                    desktop.stop()
+                    await emit("agent:paused", {"sandboxId": desktop.id})
+                    logger.info("Sandbox stopped (id=%s)", desktop.id)
+                except Exception as e:
+                    logger.warning("Failed to stop sandbox, deleting instead: %s", e)
+                    try:
+                        desktop.delete()
+                    except Exception:
+                        pass
+        await emit("agent:terminated", {})
+        # Allow queued socket events (replay:complete, agent:terminated) to flush
+        await asyncio.sleep(0.5)
+        await sio.disconnect()
+        logger.info("Worker shut down")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

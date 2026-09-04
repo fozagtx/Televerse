@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: televerse
+    runtime: image
+    repo: https://github.com/fozagtx/Televerse
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DAYTONA_API_KEY
+        sync: false
+      - key: DAYTONA_TARGET
+        value: us
+      - key: PYTHON_PATH
+        value: /app/.venv/bin/python3
+      - key: PROJECT_ROOT
+        value: /app
+      - key: WORKER_SOCKET_URL
+        value: http://localhost:3000
+    healthCheckPath: /api/health

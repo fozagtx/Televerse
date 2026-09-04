@@ -1,0 +1,233 @@
+import base64
+import time
+from daytona import ScreenshotOptions
+
+_sandbox = None
+
+
+def init(sandbox):
+    """Set the Daytona sandbox instance used by all tool functions."""
+    global _sandbox
+    _sandbox = sandbox
+
+
+def screenshot_raw_bytes() -> bytes:
+    """Take a screenshot and return raw PNG bytes."""
+    resp = _sandbox.computer_use.screenshot.take_full_screen()
+    b64 = resp.base64
+    return base64.b64decode(b64)
+
+
+def screenshot_as_base64() -> str:
+    """Take a screenshot and return base64-encoded PNG."""
+    resp = _sandbox.computer_use.screenshot.take_full_screen()
+    return resp.base64
+
+
+def click(x: int, y: int, button: str = "left", **_kwargs) -> str:
+    """Click at screen coordinates (x, y)."""
+    _sandbox.computer_use.mouse.click(x, y, button)
+    time.sleep(0.1)
+    return f"Clicked ({button}) at ({x}, {y})"
+
+
+def double_click(x: int, y: int, **_kwargs) -> str:
+    """Double-click at screen coordinates (x, y)."""
+    _sandbox.computer_use.mouse.click(x, y, "left", True)
+    return f"Double-clicked at ({x}, {y})"
+
+
+def type_text(text: str) -> str:
+    """Type the given text string. Newlines are typed as Enter key presses."""
+    parts = text.split("\n")
+    for i, part in enumerate(parts):
+        if part:
+            _sandbox.computer_use.keyboard.type(part)
+            time.sleep(0.05)
+        if i < len(parts) - 1:
+            _sandbox.computer_use.keyboard.press("enter")
+            time.sleep(0.05)
+    return f"Typed: {text}"
+
+
+_KEY_ALIASES = {
+    "return": "enter",
+    "esc": "escape",
+    "del": "delete",
+    "bs": "backspace",
+    "arrowup": "up",
+    "arrowdown": "down",
+    "arrowleft": "left",
+    "arrowright": "right",
+}
+
+
+def _normalize_key(key: str) -> str:
+    """Normalize key names."""
+    return _KEY_ALIASES.get(key.strip().lower(), key.strip().lower())
+
+
+def press_key(key: str, **_kwargs) -> str:
+    """Press a key or key combo (e.g. 'enter', 'ctrl+c')."""
+    time.sleep(0.1)
+    normalized = _normalize_key(key)
+    if "+" in normalized:
+        _sandbox.computer_use.keyboard.hotkey(normalized)
+    else:
+        _sandbox.computer_use.keyboard.press(normalized)
+    return f"Pressed: {normalized}"
+
+
+def move_mouse(x: int, y: int) -> str:
+    """Move the mouse cursor to screen coordinates (x, y) without clicking."""
+    _sandbox.computer_use.mouse.move(x, y)
+    return f"Moved mouse to ({x}, {y})"
+
+
+def scroll(x: int, y: int, direction: str = "down", amount: int = 3) -> str:
+    """Scroll at screen coordinates (x, y) in the given direction."""
+    _sandbox.computer_use.mouse.move(x, y)
+    _sandbox.computer_use.mouse.scroll(x, y, direction, amount)
+    return f"Scrolled {direction} by {amount} at ({x}, {y})"
+
+
+TOOL_FUNCTIONS = {
+    "click": click,
+    "double_click": double_click,
+    "type_text": type_text,
+    "press_key": press_key,
+    "move_mouse": move_mouse,
+    "scroll": scroll,
+}
+
+TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "click",
+            "description": "Click at screen coordinates (x, y). Defaults to left-click.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "X coordinate"},
+                    "y": {"type": "integer", "description": "Y coordinate"},
+                    "button": {
+                        "type": "string",
+                        "enum": ["left", "right", "middle"],
+                        "description": "Mouse button (default: left)",
+                    },
+                },
+                "required": ["x", "y"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "double_click",
+            "description": "Double-click at screen coordinates (x, y).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "X coordinate"},
+                    "y": {"type": "integer", "description": "Y coordinate"},
+                },
+                "required": ["x", "y"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "type_text",
+            "description": "Type the given text string on the keyboard.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to type"},
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "press_key",
+            "description": "Press a key or key combo (e.g. 'enter', 'ctrl+c', 'alt+F2').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Key or combo to press"},
+                },
+                "required": ["key"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "move_mouse",
+            "description": "Move the mouse cursor to screen coordinates (x, y) without clicking.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "X coordinate"},
+                    "y": {"type": "integer", "description": "Y coordinate"},
+                },
+                "required": ["x", "y"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scroll",
+            "description": "Scroll at screen coordinates (x, y) in a direction. Use for scrolling web pages, documents, etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "X coordinate"},
+                    "y": {"type": "integer", "description": "Y coordinate"},
+                    "direction": {
+                        "type": "string",
+                        "enum": ["up", "down"],
+                        "description": "Direction to scroll",
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "Number of scroll steps (default 3)",
+                    },
+                },
+                "required": ["x", "y", "direction"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "done",
+            "description": "Call this when the task is complete. Provide a summary of what you accomplished.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string", "description": "Summary of what was accomplished"},
+                },
+                "required": ["summary"],
+            },
+        },
+    },
+]
+
+
+def execute_tool(name, arguments):
+    """Execute a tool by name with the given arguments dict. Returns result string."""
+    if name == "done":
+        return arguments.get("summary", "Task complete")
+    func = TOOL_FUNCTIONS.get(name)
+    if not func:
+        return f"ERROR: Unknown tool '{name}'. Available tools: {', '.join(TOOL_FUNCTIONS.keys())}, done"
+    try:
+        return func(**arguments)
+    except Exception as e:
+        return f"ERROR: {name}({arguments}) failed — {e}. Please fix your arguments and try again."
