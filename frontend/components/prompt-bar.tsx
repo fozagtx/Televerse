@@ -14,6 +14,7 @@ interface PromptBarProps {
   tasksComplete?: boolean;
   onFollowUp?: (prompt: string) => void;
   isMobile?: boolean;
+  followUpPlacement?: "top" | "external";
 }
 
 export function PromptBar({
@@ -24,6 +25,7 @@ export function PromptBar({
   tasksComplete = false,
   onFollowUp,
   isMobile = false,
+  followUpPlacement = "top",
 }: PromptBarProps) {
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [followUpText, setFollowUpText] = useState("");
@@ -40,7 +42,7 @@ export function PromptBar({
   return (
     <div className="shrink-0 border-b border-border bg-card px-3 py-3 lg:px-6 lg:py-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:gap-4">
-        {tasksComplete ? (
+        {tasksComplete && followUpPlacement === "top" ? (
           <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
             <Textarea
               value={followUpText}

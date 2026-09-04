@@ -40,6 +40,8 @@ interface SessionWorkspaceProps {
   initialPrompt?: string;
   agentCount?: number;
   embedded?: boolean;
+  followUpRequest?: string;
+  onFollowUpHandled?: () => void;
 }
 
 export function SessionWorkspace({
@@ -47,6 +49,8 @@ export function SessionWorkspace({
   initialPrompt = "",
   agentCount = 4,
   embedded = false,
+  followUpRequest = "",
+  onFollowUpHandled,
 }: SessionWorkspaceProps) {
   const router = useRouter();
   const isMock = sessionId === "demo";
@@ -77,6 +81,7 @@ export function SessionWorkspace({
   const [isStopping, setIsStopping] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [socketReady, setSocketReady] = useState(false);
   const isDesktop = useIsDesktop();
   const isMobile = useIsMobile();
 
@@ -103,6 +108,22 @@ export function SessionWorkspace({
     }
     setSessionComplete(true);
   }, [sessionId]);
+
+  const handleFollowUp = useCallback((text: string) => {
+    if (!socketRef.current || !text.trim()) return;
+    socketRef.current.emit("session:followup", { sessionId, prompt: text.trim() });
+    setTasksDone(false);
+    setSessionComplete(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!followUpRequest.trim() || !socketReady || !socketRef.current) return;
+    socketRef.current.emit("session:followup", {
+      sessionId,
+      prompt: followUpRequest.trim(),
+    });
+    window.setTimeout(() => onFollowUpHandled?.(), 0);
+  }, [followUpRequest, socketReady, sessionId, onFollowUpHandled]);
 
   const handleAgentCommand = useCallback(
     (agentId: string, message: string) => {
@@ -226,11 +247,13 @@ export function SessionWorkspace({
       socketRef.current = socket;
 
       socket.on("connect", () => {
+        setSocketReady(true);
         setIsLoading(false);
         setError(null);
       });
 
       socket.on("connect_error", () => {
+        setSocketReady(false);
         setError("Failed to connect to session");
         setIsLoading(false);
       });
@@ -363,27 +386,33 @@ export function SessionWorkspace({
         setAgents((prev) =>
           prev.map((agent) =>
             agent.id === data.agentId
-              ? { ...agent, status: "error" as const, errorMessage: data.error }
+              ? { ...agent, status: "error" as const, streamUrl: undefined, errorMessage: data.error }
               : agent
           )
         );
-        setThinkingEntries((prev) => [
-          ...prev,
-          {
-            id: `${data.agentId}-error-${Date.now()}-${Math.random()}`,
-            agentId: data.agentId,
-            timestamp: new Date().toISOString(),
-            action: `Error: ${data.error}`,
-            isError: true,
-          },
-        ]);
+        setThinkingEntries((prev) => {
+          const action = `Error: ${data.error}`;
+          if (prev.some((entry) => entry.agentId === data.agentId && entry.action === action)) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: `${data.agentId}-error-${Date.now()}`,
+              agentId: data.agentId,
+              timestamp: new Date().toISOString(),
+              action,
+              isError: true,
+            },
+          ];
+        });
       });
 
       socket.on("agent:terminated", (data: AgentTerminatedEvent) => {
         setAgents((prev) =>
           prev.map((agent) =>
             agent.id === data.agentId
-              ? { ...agent, status: "terminated" as const }
+              ? { ...agent, status: "terminated" as const, streamUrl: undefined }
               : agent
           )
         );
@@ -393,7 +422,7 @@ export function SessionWorkspace({
         setAgents((prev) =>
           prev.map((agent) =>
             agent.id === data.agentId
-              ? { ...agent, status: "paused" as const, sandboxId: data.sandboxId }
+              ? { ...agent, status: "paused" as const, sandboxId: data.sandboxId, streamUrl: undefined }
               : agent
           )
         );
@@ -403,7 +432,7 @@ export function SessionWorkspace({
         setAgents((prev) => {
           const updated = prev.map((agent) =>
             agent.id === data.agentId
-              ? { ...agent, status: "expired" as const }
+              ? { ...agent, status: "expired" as const, streamUrl: undefined }
               : agent
           );
           // Check if all sandboxes are now dead
@@ -447,6 +476,7 @@ export function SessionWorkspace({
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      setSocketReady(false);
     };
   }, [sessionId, isMock, router]);
 
@@ -569,18 +599,14 @@ export function SessionWorkspace({
         onStop={handleStop}
         tasksComplete={tasksDone || sessionComplete || isStopping}
         isMobile={isMobile}
-        onFollowUp={(text) => {
-          if (socketRef.current) {
-            socketRef.current.emit("session:followup", { sessionId, prompt: text });
-            setTasksDone(false);
-          }
-        }}
+        followUpPlacement={embedded ? "external" : "top"}
+        onFollowUp={handleFollowUp}
       />
 
       {/* Main content: browser/grid + thinking sidebar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Agent view */}
-        <div className="flex-1 p-2 lg:p-3 min-w-0">
+        <div className="min-w-0 flex-1 p-0 lg:p-2">
           {effectiveViewMode === "tabs" ? (
             <AgentBrowser
               agents={agents}
@@ -605,7 +631,7 @@ export function SessionWorkspace({
 
         {/* Thinking sidebar — desktop only */}
         {isDesktop && (
-          <div className="w-[360px] shrink-0">
+          <div className="w-[280px] shrink-0 xl:w-[300px]">
             <ThinkingSidebar
               entries={thinkingEntries}
               agents={agents}

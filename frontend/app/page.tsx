@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, RotateCcw } from "lucide-react";
+import { Loader2, Play, RotateCcw, Send } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   CloudIcon,
@@ -19,6 +19,8 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [followUpText, setFollowUpText] = useState("");
+  const [followUpRequest, setFollowUpRequest] = useState("");
 
   const handleSubmit = async () => {
     if (!prompt.trim() || isSubmitting) return;
@@ -62,6 +64,8 @@ export default function Home() {
     setSessionId(null);
     setActivePrompt("");
     setError(null);
+    setFollowUpText("");
+    setFollowUpRequest("");
   };
 
   return (
@@ -94,7 +98,8 @@ export default function Home() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Tell the agent what to do in the web app, fields, browser, or sandbox..."
-                className="h-36 min-h-[140px] resize-none text-sm sm:h-40"
+                readOnly={!!sessionId}
+                className="h-28 min-h-[112px] resize-none text-sm sm:h-32"
                 onKeyDown={(e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                     e.preventDefault();
@@ -103,6 +108,44 @@ export default function Home() {
                 }}
               />
             </div>
+
+            {sessionId && (
+              <div className="shrink-0 space-y-2 border-t border-border pt-4">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Follow-up instruction
+                </label>
+                <Textarea
+                  value={followUpText}
+                  onChange={(e) => setFollowUpText(e.target.value)}
+                  placeholder="Give the agent the next instruction..."
+                  className="h-24 min-h-[96px] resize-none text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      const next = followUpText.trim();
+                      if (next) {
+                        setFollowUpRequest(next);
+                        setFollowUpText("");
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  disabled={!followUpText.trim()}
+                  onClick={() => {
+                    const next = followUpText.trim();
+                    if (!next) return;
+                    setFollowUpRequest(next);
+                    setFollowUpText("");
+                  }}
+                  className="h-9 w-full gap-2"
+                >
+                  <Send className="size-3.5" />
+                  Send follow-up
+                </Button>
+              </div>
+            )}
 
             {error && (
               <div className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground">
@@ -150,6 +193,8 @@ export default function Home() {
               initialPrompt={activePrompt}
               agentCount={1}
               embedded
+              followUpRequest={followUpRequest}
+              onFollowUpHandled={() => setFollowUpRequest("")}
             />
           ) : isSubmitting ? (
             <LaunchWorkspace />
