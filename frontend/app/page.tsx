@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Play, RotateCcw } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CloudIcon } from "@hugeicons/core-free-icons";
+import {
+  CloudIcon,
+  ComputerCloudIcon,
+  CursorProgress03Icon,
+} from "@hugeicons/core-free-icons";
 import { SessionWorkspace } from "./session/[id]/page";
 
 export default function Home() {
@@ -147,26 +151,109 @@ export default function Home() {
               agentCount={1}
               embedded
             />
+          ) : isSubmitting ? (
+            <LaunchWorkspace />
           ) : (
-            <div className="flex h-full min-h-[520px] items-center justify-center px-4 py-10 text-center">
-              <div className="max-w-md space-y-3">
-                <HugeiconsIcon
-                  icon={CloudIcon}
-                  size={42}
-                  strokeWidth={1.5}
-                  className="mx-auto text-foreground"
-                />
-                <h2 className="text-2xl font-bold text-foreground">
-                  Sandbox ready area
-                </h2>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Enter the instruction on the left. After start, the agent browser, VNC stream, actions, and task state appear here.
-                </p>
-              </div>
-            </div>
+            <IdleWorkspace />
           )}
         </section>
       </main>
+    </div>
+  );
+}
+
+function IdleWorkspace() {
+  return (
+    <div className="flex h-full min-h-[520px] flex-col">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5 sm:px-7">
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Workspace idle
+        </span>
+        <span className="text-xs text-muted-foreground">No active session</span>
+      </div>
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="flex items-center justify-center border-b border-border px-5 py-14 text-center lg:border-b-0 lg:border-r">
+          <div className="max-w-sm space-y-4">
+            <HugeiconsIcon
+              icon={CloudIcon}
+              size={46}
+              strokeWidth={1.5}
+              className="mx-auto text-foreground"
+            />
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-foreground">
+                No sandbox running
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                No agents or cloud desktops are active. Enter an instruction on the left to begin.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="hidden items-center justify-center px-5 lg:flex">
+          <div className="space-y-3 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Thinking
+            </p>
+            <p className="text-sm text-muted-foreground">No active agent</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LaunchWorkspace() {
+  return (
+    <div className="flex h-full min-h-[520px] flex-col">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5 sm:px-7">
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground">
+          Starting session
+        </span>
+        <span className="text-xs text-muted-foreground">Preparing workspace</span>
+      </div>
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="flex items-center justify-center border-b border-border px-5 py-14 text-center lg:border-b-0 lg:border-r">
+          <div className="max-w-sm space-y-5">
+            <HugeiconsIcon
+              icon={ComputerCloudIcon}
+              size={46}
+              strokeWidth={1.5}
+              className="mx-auto text-foreground"
+            />
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-foreground">
+                Provisioning cloud desktop
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                The agent appears here after the sandbox and VNC stream are ready.
+              </p>
+            </div>
+            <div className="space-y-2 text-left text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-foreground">
+                <HugeiconsIcon icon={CursorProgress03Icon} size={16} className="animate-spin" />
+                Creating session
+              </div>
+              <div className="flex items-center gap-2">
+                <HugeiconsIcon icon={ComputerCloudIcon} size={16} />
+                Starting sandbox
+              </div>
+              <div className="flex items-center gap-2">
+                <HugeiconsIcon icon={CloudIcon} size={16} />
+                Waiting for VNC stream
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="hidden items-center justify-center px-5 lg:flex">
+          <div className="space-y-3 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Thinking
+            </p>
+            <p className="text-sm text-muted-foreground">Waiting for agent start</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
