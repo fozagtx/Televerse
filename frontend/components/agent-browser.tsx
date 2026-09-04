@@ -146,6 +146,7 @@ export function AgentBrowser({
                       agentId={agent.id}
                       activity={agentActivity}
                       status={agent.status || "booting"}
+                      errorMessage={agent.errorMessage}
                     />
                   </div>
                 ) : null;
@@ -206,6 +207,7 @@ function ReplayEnabledView({
                   agentId={agent.id}
                   activity={agentActivity}
                   status={agent.status || "booting"}
+                  errorMessage={agent.errorMessage}
                 />
               </div>
             ) : null;

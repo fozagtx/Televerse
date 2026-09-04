@@ -117,6 +117,7 @@ function AgentGridCell({
             agentId={agent.id}
             activity={activity}
             status={agent.status}
+            errorMessage={agent.errorMessage}
           />
         )}
       </div>

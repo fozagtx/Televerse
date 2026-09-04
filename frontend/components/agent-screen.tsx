@@ -8,9 +8,10 @@ interface AgentScreenProps {
   agentId: string;
   activity: AgentActivity;
   status: string;
+  errorMessage?: string;
 }
 
-export function AgentScreen({ agentId, activity, status }: AgentScreenProps) {
+export function AgentScreen({ agentId, activity, status, errorMessage }: AgentScreenProps) {
   if (status === "booting") {
     return <BootSequence gradient={activity?.gradient} />;
   }
@@ -28,8 +29,8 @@ export function AgentScreen({ agentId, activity, status }: AgentScreenProps) {
             <p className="text-sm text-red-400 font-medium">
               Agent error
             </p>
-            <p className="text-xs text-muted-foreground/50">
-              This agent encountered an error
+            <p className="max-w-sm whitespace-pre-wrap px-4 text-xs text-muted-foreground/70">
+              {errorMessage || "This agent encountered an error"}
             </p>
           </div>
         </div>

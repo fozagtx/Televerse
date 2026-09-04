@@ -291,6 +291,7 @@ function SessionContent() {
                   ...agent,
                   streamUrl: data.streamUrl,
                   status: "active" as const,
+                  errorMessage: undefined,
                 }
               : agent
           )
@@ -354,7 +355,7 @@ function SessionContent() {
         setAgents((prev) =>
           prev.map((agent) =>
             agent.id === data.agentId
-              ? { ...agent, status: "error" as const }
+              ? { ...agent, status: "error" as const, errorMessage: data.error }
               : agent
           )
         );

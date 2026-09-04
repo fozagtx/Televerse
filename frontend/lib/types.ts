@@ -35,6 +35,7 @@ export interface Agent {
   currentTaskId: string | null;
   sandboxId?: string;
   streamUrl?: string;
+  errorMessage?: string;
   tasksCompleted?: number;
   tasksTotal?: number;
 }
