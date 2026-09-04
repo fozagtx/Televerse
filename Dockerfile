@@ -20,8 +20,11 @@ WORKDIR /app
 
 # Install Python dependencies
 COPY workers/requirements.txt ./workers/
+ARG WORKER_DEPENDENCY_REV=daytona-v1
 RUN python3 -m venv /app/.venv && \
+    /app/.venv/bin/pip install --upgrade pip && \
     /app/.venv/bin/pip install --no-cache-dir -r workers/requirements.txt
+RUN /app/.venv/bin/python -c "import daytona, aiohttp, socketio; print('worker dependencies installed')"
 
 # Copy built frontend + source (custom server needs lib/ at runtime)
 COPY --from=builder /app/frontend/.next ./.next
