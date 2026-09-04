@@ -114,6 +114,8 @@ npm run dev
 
 Opens at http://localhost:3000. The WebMCP tool harness is at http://localhost:3000/dev/mcp.
 
+**Live site:** https://televerse-egjd.onrender.com
+
 ## Testing
 
 ```bash
