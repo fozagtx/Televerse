@@ -1,20 +1,22 @@
 ## Inspiration
 
-You're building a checkout flow with Codex. The agent is on a roll -- shipping tests, wiring up the payment handler, everything flowing. Then a `500` hits `/api/checkout`. Do you stop the agent to investigate? Or push on and hope the error fixes itself?
+Millions of hours are spent every year watching your AI agent debug a side problem while your main task sits frozen. The checkout flow is half-built, but the payment API is returning 500, and now your agent is stuck investigating instead of shipping.
 
-Both options lose. We wanted a third path: teleport a copy of your agent into an isolated desktop, have it investigate the error, return structured findings -- while your primary agent keeps shipping.
+We wanted to build something that doesn't make you choose between progress and debugging. What if your agent could teleport a copy of itself into a separate desktop, fix the bug over there, and hand you the result -- while the original agent keeps building?
+
+So we built Televerse.
 
 ## What it does
 
-Televerse is Agent Teleportation for Codex. It exposes high-level WebMCP tools (`teleport_agent`, `get_teleport_status`, `retrieve_teleport_result`) that AI agents discover and invoke through the browser. When a side problem appears, the user's agent calls `teleport_agent` with a task description. Televerse captures context from the primary session, spawns a fresh Daytona sandbox with a real browser and terminal, and the teleported agent investigates independently. When done, it returns a structured result: summary, root cause, evidence, files inspected, commands run, and an optional patch for review.
+Televerse is a WebMCP-powered web app. Your coding agent (Codex, ChatGPT, any browser-based agent) discovers seven tools on the page. When a side problem comes up, the agent calls `teleport_agent` with a task description. Televerse captures context from the current session, spawns a fresh Daytona sandbox with a browser and terminal, and a second agent investigates independently. When it finishes, it returns a summary, root cause, evidence, files inspected, commands and tests run, and an optional patch. The primary agent reviews and decides whether to apply. Your main task never stops.
 
 ## How we built it
 
-Next.js 16 custom server with Socket.io for real-time streaming. The WebMCP draft API (`document.modelContext.registerTool`) exposes seven tools covering the full teleport lifecycle. Each teleport creates an isolated session with its own Daytona cloud desktop, Socket.io room, and whiteboard -- the primary session is never touched. Context is captured as a compact packet (prompt, recent todos, whiteboard, errors, constraints) and seeded into the teleported agent's system prompt. The frontend has a teleport modal, live detail page with activity log and evidence panel, and a dev harness at `/dev/mcp` for testing tools without a browser agent. The orchestrator, teleport store, REST API, and WebMCP registry are all TypeScript in the Next.js app.
+Next.js 16 custom server with Socket.io for real-time streaming. The WebMCP draft API (`document.modelContext.registerTool`) registers seven tools on every page load. Each teleport creates a separate Opticon session with its own Daytona sandbox, Socket.io room, and whiteboard -- the primary session is never touched. Context is captured as a compact packet (prompt, recent todos, whiteboard, errors, constraints) and seeded into the teleported agent's system prompt. The frontend has a teleport modal, a live detail page with activity log and evidence panel, and a dev harness at `/dev/mcp` for testing tools without a browser agent. The backend was originally built on E2B Desktop and Dedalus Labs; we ripped out both and replaced them with Daytona sandboxes, then removed the LLM dependency entirely once we realized the WebMCP path needs no API key at all.
 
 ## Challenges we ran into
 
-The WebMCP API is a draft -- only in Chrome 149+ behind a flag. We built a dual registry: real `document.modelContext` when available, a dev fallback on `window` for testing. The Daytona swap was mechanical but tedious -- every E2B tool call (`left_click`, `right_click`, `get_url()`) had to be rewritten to Daytona's unified API (`mouse.click(x, y, button)`, `get_preview_link(6080)`). The hard part was designing the TeleportContext: enough context to be useful, but compact enough that the teleported agent doesn't waste tokens.
+The WebMCP API is a draft, only in Chrome 149+ behind a flag. We built a dual registry: real `document.modelContext` when available, a dev fallback on `window` for testing. The Daytona swap was mechanical but tedious -- every E2B tool call had to be rewritten to Daytona's unified API. The hard part was designing the TeleportContext: enough context to be useful, but compact enough that the teleported agent doesn't waste tokens.
 
 ## Accomplishments that we're proud of
 
@@ -22,8 +24,8 @@ The WebMCP surface works. Open the site in Chrome with the flag enabled, and any
 
 ## What we learned
 
-WebMCP changes the agent-web contract. Instead of the agent scraping the DOM and guessing what to click, the site declares high-level tools with explicit schemas. The agent delegates, the site executes. The hardest design problem was the handoff -- not how the sandbox boots, but how the teleported agent's result gets back to the primary agent in a structured, reviewable format. We built `TeleportResult` with summary, root cause, evidence, and patch -- designed to be consumed by both a human in the UI and the primary agent programmatically.
+WebMCP changes the agent-web contract. Instead of the agent scraping the DOM and guessing what to click, the site declares high-level tools with explicit schemas. The agent delegates, the site executes. The hardest design problem was the handoff -- not how the sandbox boots, but how the teleported agent's result gets back to the primary agent in a structured, reviewable format.
 
 ## What's next for Televerse
 
-DB persistence so teleports survive server restarts. Multi-session picker for the teleport modal. Optional autonomous computer-use agent (bring your own Anthropic/OpenAI key) that drives the desktop and collects evidence by actually clicking around. Git-aware teleport context that captures the current branch, diff, and recent commits. Daytona screen recordings for replaying the teleported agent's activity.
+DB persistence so teleports survive server restarts. Multi-session picker for the teleport modal. Optional autonomous computer-use agent that drives the desktop and collects evidence by actually clicking around. Git-aware teleport context that captures the current branch, diff, and recent commits. Daytona screen recordings for replaying the teleported agent's activity.
