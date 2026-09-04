@@ -490,9 +490,9 @@ function SessionContent() {
     <div className="flex h-screen flex-col">
       {/* Recovering banner */}
       {isRecovering && (
-        <div className="shrink-0 border-b border-cyan-500/20 bg-cyan-500/10 px-3 py-2 lg:px-5 lg:py-3 flex items-center gap-2 lg:gap-3">
-          <Loader2 className="size-3.5 lg:size-4 animate-spin text-cyan-400" />
-          <p className="text-xs lg:text-sm text-cyan-400 font-medium">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-secondary px-3 py-2 text-foreground lg:gap-3 lg:px-5 lg:py-3">
+          <Loader2 className="size-3.5 animate-spin lg:size-4" />
+          <p className="text-xs font-medium lg:text-sm">
             Reconnecting to session...
           </p>
         </div>
@@ -500,13 +500,13 @@ function SessionContent() {
 
       {/* Session expired banner */}
       {sessionExpired && !sessionComplete && (
-        <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 lg:px-5 lg:py-3 flex items-center justify-between">
-          <p className="text-xs lg:text-sm text-amber-400 font-medium">
-            Session expired — sandboxes timed out
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-secondary px-3 py-2 text-foreground lg:px-5 lg:py-3">
+          <p className="min-w-0 text-xs font-medium lg:text-sm">
+            Session expired - sandboxes timed out
           </p>
           <button
             onClick={() => router.push(`/session/${sessionId}/summary`)}
-            className="text-xs lg:text-sm text-amber-400 hover:text-amber-300 font-medium transition-colors border border-amber-500/30 rounded-md px-2 lg:px-3 py-1 shrink-0"
+            className="shrink-0 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-background lg:px-3 lg:text-sm"
           >
             View Results
           </button>
@@ -515,23 +515,23 @@ function SessionContent() {
 
       {/* Stopping banner */}
       {isStopping && !sessionComplete && (
-        <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 lg:px-5 lg:py-3 flex items-center gap-2 lg:gap-3">
-          <Loader2 className="size-3.5 lg:size-4 animate-spin text-amber-400" />
-          <p className="text-xs lg:text-sm text-amber-400 font-medium">
-            Stopping — saving replays...
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-secondary px-3 py-2 text-foreground lg:gap-3 lg:px-5 lg:py-3">
+          <Loader2 className="size-3.5 animate-spin lg:size-4" />
+          <p className="text-xs font-medium lg:text-sm">
+            Stopping - saving replays...
           </p>
         </div>
       )}
 
       {/* Completion banner */}
       {sessionComplete && (
-        <div className="shrink-0 border-b border-emerald-500/20 bg-emerald-500/10 px-3 py-2 lg:px-5 lg:py-3 flex items-center justify-between">
-          <p className="text-xs lg:text-sm text-emerald-400 font-medium">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-secondary px-3 py-2 text-foreground lg:px-5 lg:py-3">
+          <p className="text-xs font-medium lg:text-sm">
             Session finished
           </p>
           <button
             onClick={() => router.push(`/session/${sessionId}/summary`)}
-            className="text-xs lg:text-sm text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+            className="text-xs font-medium transition-colors hover:underline lg:text-sm"
           >
             View Summary
           </button>
@@ -540,13 +540,13 @@ function SessionContent() {
 
       {/* Tasks done banner */}
       {tasksDone && !sessionComplete && (
-        <div className="shrink-0 border-b border-emerald-500/20 bg-emerald-500/10 px-3 py-2 lg:px-5 lg:py-3 flex items-center justify-between">
-          <p className="text-xs lg:text-sm text-emerald-400 font-medium line-clamp-1">
-            All tasks completed — standing by for follow-ups
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-secondary px-3 py-2 text-foreground lg:px-5 lg:py-3">
+          <p className="min-w-0 text-xs font-medium lg:text-sm">
+            All tasks completed - standing by for follow-ups
           </p>
           <button
             onClick={handleFinish}
-            className="text-xs lg:text-sm text-emerald-400 hover:text-emerald-300 font-medium transition-colors border border-emerald-500/30 rounded-md px-2 lg:px-3 py-1 shrink-0"
+            className="shrink-0 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-background lg:px-3 lg:text-sm"
           >
             Finish
           </button>

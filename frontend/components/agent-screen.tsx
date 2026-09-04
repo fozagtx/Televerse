@@ -11,25 +11,23 @@ interface AgentScreenProps {
   errorMessage?: string;
 }
 
-export function AgentScreen({ agentId, activity, status, errorMessage }: AgentScreenProps) {
+export function AgentScreen({ activity, status, errorMessage }: AgentScreenProps) {
   if (status === "booting") {
-    return <BootSequence gradient={activity?.gradient} />;
+    return <BootSequence />;
   }
 
   if (status === "error") {
     return (
-      <div
-        className={`flex h-full items-center justify-center bg-gradient-to-br ${activity?.gradient || "from-red-950/80 to-slate-950"}`}
-      >
-        <div className="text-center space-y-3">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 backdrop-blur">
-            <Monitor className="size-5 text-red-400" />
+      <div className="flex h-full items-center justify-center bg-black text-white">
+        <div className="space-y-3 px-4 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-white/30 bg-white/10 backdrop-blur">
+            <Monitor className="size-5 text-white" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-red-400 font-medium">
+            <p className="text-sm font-medium text-white">
               Agent error
             </p>
-            <p className="max-w-sm whitespace-pre-wrap px-4 text-xs text-muted-foreground/70">
+            <p className="max-w-sm whitespace-pre-wrap text-xs text-white/70">
               {errorMessage || "This agent encountered an error"}
             </p>
           </div>
@@ -40,10 +38,10 @@ export function AgentScreen({ agentId, activity, status, errorMessage }: AgentSc
 
   if (!activity) {
     return (
-      <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-950 to-zinc-950">
+      <div className="flex h-full items-center justify-center bg-black text-white">
         <div className="text-center space-y-3">
-          <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground/50">Loading...</p>
+          <Loader2 className="mx-auto size-5 animate-spin text-white/60" />
+          <p className="text-sm text-white/60">Loading...</p>
         </div>
       </div>
     );
@@ -55,23 +53,21 @@ export function AgentScreen({ agentId, activity, status, errorMessage }: AgentSc
   return <MockWaitingScreen />;
 }
 
-function BootSequence({ gradient }: { gradient?: string }) {
+function BootSequence() {
   return (
-    <div
-      className={`flex h-full items-center justify-center bg-gradient-to-br ${gradient || "from-slate-950 to-zinc-950"}`}
-    >
-      <div className="text-center space-y-5">
-        <div className="mx-auto flex size-14 items-center justify-center rounded-xl border border-border bg-background/10 backdrop-blur">
-          <Monitor className="size-6 text-muted-foreground" />
+    <div className="flex h-full items-center justify-center bg-black text-white">
+      <div className="space-y-5 px-4 text-center">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-xl border border-white/30 bg-white/10 backdrop-blur">
+          <Monitor className="size-6 text-white/70" />
         </div>
 
-        <div className="flex items-center gap-3 text-sm text-foreground">
-          <Loader2 className="size-4 animate-spin text-primary" />
+        <div className="flex items-center justify-center gap-3 text-sm text-white">
+          <Loader2 className="size-4 animate-spin text-white" />
           <span>Booting sandbox</span>
         </div>
 
-        <div className="w-48 mx-auto h-1 bg-white/5 rounded-full overflow-hidden">
-          <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/60" />
+        <div className="w-48 max-w-full mx-auto h-1 bg-white/20 rounded-full overflow-hidden">
+          <div className="h-full w-1/2 animate-pulse rounded-full bg-white" />
         </div>
       </div>
     </div>
@@ -336,7 +332,7 @@ function MockTerminalScreen() {
 
 function MockWaitingScreen() {
   return (
-    <div className="flex h-full items-center justify-center bg-gradient-to-br from-amber-950/30 to-slate-950">
+    <div className="flex h-full items-center justify-center bg-black text-white">
       <div className="text-center space-y-3">
         <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-border bg-background/10 backdrop-blur">
           <Monitor className="size-5 text-muted-foreground" />

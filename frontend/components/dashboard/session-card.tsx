@@ -66,7 +66,7 @@ export function SessionCard({
             className="h-full w-full object-cover transition-opacity duration-500"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+          <div className="flex h-full w-full items-center justify-center bg-black text-white">
             <span className="text-2xl text-zinc-700/50 font-bold">
               {session.prompt.charAt(0).toUpperCase()}
             </span>

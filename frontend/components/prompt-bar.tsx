@@ -38,10 +38,10 @@ export function PromptBar({
   };
 
   return (
-    <div className="shrink-0 border-b border-border bg-card/50 px-3 py-3 lg:px-6 lg:py-5">
-      <div className="flex items-start justify-between gap-3 lg:gap-4">
+    <div className="shrink-0 border-b border-border bg-card px-3 py-3 lg:px-6 lg:py-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:gap-4">
         {tasksComplete ? (
-          <div className="flex-1 min-w-0 flex gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
             <Textarea
               value={followUpText}
               onChange={(e) => setFollowUpText(e.target.value)}
@@ -56,7 +56,7 @@ export function PromptBar({
             />
             <Button
               size="icon"
-              className="size-10 shrink-0"
+              className="size-10 shrink-0 self-end sm:self-start"
               disabled={!followUpText.trim() || isSubmitting}
               onClick={handleFollowUpSubmit}
             >
@@ -65,14 +65,14 @@ export function PromptBar({
           </div>
         ) : (
           <p className={cn(
-            "font-medium text-foreground leading-snug min-w-0",
-            isMobile ? "text-sm line-clamp-1" : "text-lg"
+            "min-w-0 flex-1 break-words font-medium leading-snug text-foreground",
+            isMobile ? "text-sm line-clamp-2" : "text-lg"
           )}>
             {prompt}
           </p>
         )}
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           {/* View mode toggle — hide on mobile */}
           {!isMobile && (
             <>
@@ -110,8 +110,8 @@ export function PromptBar({
 
               {/* Stop button */}
               {showStopConfirm ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">
                     Stop?
                   </span>
                   <Button
@@ -138,7 +138,7 @@ export function PromptBar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  className="size-8 text-muted-foreground hover:bg-accent hover:text-foreground"
                   onClick={() => setShowStopConfirm(true)}
                   title="Stop session"
                 >

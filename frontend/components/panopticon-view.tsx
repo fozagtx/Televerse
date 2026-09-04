@@ -98,11 +98,11 @@ function AgentTile({
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         ) : agent.streamUrl ? (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900 text-xs text-zinc-500">
+          <div className="flex h-full items-center justify-center bg-black text-xs text-white">
             Loading preview...
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900 text-xs text-zinc-500">
+          <div className="flex h-full items-center justify-center bg-black text-xs text-white">
             Booting...
           </div>
         )}

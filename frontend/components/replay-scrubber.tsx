@@ -154,14 +154,14 @@ export function ReplayFrameOverlay({ frame, isLive }: ReplayFrameOverlayProps) {
       />
 
       {/* Action label */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2">
+      <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2">
         <p className="text-xs text-white/80 truncate">
           {frame.action}
         </p>
       </div>
 
       {/* "Replay" badge */}
-      <div className="absolute top-2 left-2 px-2 py-0.5 bg-amber-500/80 rounded text-[10px] text-black font-medium">
+      <div className="absolute top-2 left-2 px-2 py-0.5 bg-white rounded text-[10px] text-black font-medium">
         REPLAY
       </div>
     </div>
@@ -347,7 +347,7 @@ export function ReplayScrubber({ manifestUrl, agentLabel }: ReplayScrubberProps)
         )}
 
         {state.currentFrame && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2">
+          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2">
             <p className="text-xs text-white/80 truncate">
               {state.currentFrame.action}
             </p>
