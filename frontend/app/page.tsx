@@ -2,51 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
-import { useBilling } from "@flowglad/nextjs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, LogOut, Lock, Zap } from "lucide-react";
-import { PlanBadge } from "@/components/plan-badge";
-import { PLAN_LIMITS, PRO_FEATURE_SLUG } from "@/lib/billing-constants";
-import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
-import { MobilePromptSheet } from "@/components/mobile-prompt-sheet";
-import { MobileNav } from "@/components/mobile-nav";
-import { useDashboardSocket } from "@/hooks/use-dashboard-socket";
-import { useIsDesktop } from "@/hooks/use-media-query";
-import { TeleportModal, TeleportList } from "@/components/teleport/teleport-list";
+import { Loader2, Zap, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 const EXAMPLE_PROMPTS = [
   {
+    label: "Debug Payment 500",
+    prompt:
+      "Clone the checkout repo, open the app in the browser, reproduce the payment 500 error. Inspect the network tab and payment handler code. Find the root cause and return a patch.",
+  },
+  {
     label: "Browser QA Testing",
     prompt:
-      "Clone the repo at https://github.com/example/checkout-app, open it in the browser, and run the QA test suite. Check for console errors, broken layout, and form validation issues. Report every failure with screenshots.",
+      "Clone the repo, open it in the browser, and run the QA checks. Look for console errors, broken layout, and form validation issues. Report every failure.",
   },
   {
     label: "Install OpenClaw",
     prompt:
-      "Open a terminal, install OpenClaw by running curl -fsSL https://openclaw.ai/install.sh | bash, verify it installed correctly, and report back the version.",
-  },
-  {
-    label: "Debug Payment 500",
-    prompt:
-      "Clone the checkout repo, open the app in the browser, reproduce the payment 500 error. Inspect the network tab, check the console, and look at the payment handler code. Find the root cause and return a patch.",
-  },
-  {
-    label: "Data Dashboard",
-    prompt:
-      "Build an interactive sales dashboard with charts and filters using a spreadsheet app. Include monthly revenue, top products, and regional breakdowns.",
-  },
-  {
-    label: "Research + Fix Bug",
-    prompt:
-      "Clone the repo, open the project in the browser, reproduce the reported rendering bug. Inspect the CSS and JS, identify the root cause, and prepare a fix. Run the existing tests to confirm the fix doesn't break anything.",
-  },
-  {
-    label: "Market Analysis",
-    prompt:
-      "Research the competitive landscape for AI development tools. Monitor pricing changes, feature releases, and community sentiment across 10+ companies. Track everything in a comprehensive document.",
+      "Open a terminal, install OpenClaw with curl -fsSL https://openclaw.ai/install.sh | bash, verify the version, and report back.",
   },
 ];
 
@@ -54,84 +29,34 @@ interface SessionHistoryItem {
   id: string;
   prompt: string;
   status: string;
-  createdAt: Date;
-  todos: { id: string; description: string; status: string }[];
+  createdAt: string;
   latestThumbnail?: string;
 }
 
 export default function Home() {
-  const { data: authSession } = useSession();
-  const { checkFeatureAccess } = useBilling();
   const [prompt, setPrompt] = useState("");
-  const [agentCount, setAgentCount] = useState(2);
-
-  const isPro = checkFeatureAccess?.(PRO_FEATURE_SLUG) ?? false;
-  const maxAgents = isPro
-    ? PLAN_LIMITS.pro.maxAgents
-    : PLAN_LIMITS.free.maxAgents;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<SessionHistoryItem[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [mobilePromptOpen, setMobilePromptOpen] = useState(false);
-  const [teleportOpen, setTeleportOpen] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const router = useRouter();
-  const isDesktop = useIsDesktop();
-  const { thumbnails, sessionUpdates } = useDashboardSocket();
-
-  // Fetch sessions on mount
-  useEffect(() => {
-    async function fetchSessions() {
-      try {
-        const response = await fetch("/api/sessions/history");
-        if (response.ok) {
-          const data = await response.json();
-          setSessions(data.sessions);
-        }
-      } catch {
-        // Silently fail — user may not be authenticated
-      } finally {
-        setSessionsLoading(false);
-      }
-    }
-    fetchSessions();
-  }, []);
-
-  // Merge live session updates from socket
-  useEffect(() => {
-    if (sessionUpdates.size === 0) return;
-    setSessions((prev) =>
-      prev.map((s) => {
-        const update = sessionUpdates.get(s.id);
-        if (!update) return s;
-        return { ...s, status: update.status };
-      })
-    );
-  }, [sessionUpdates]);
 
   const handleSubmit = async () => {
     if (!prompt.trim() || isSubmitting) return;
-
     setIsSubmitting(true);
     setError(null);
-
     try {
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: prompt.trim(),
-          agentCount,
+          agentCount: 1,
         }),
       });
-
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Failed to create session");
       }
-
       const { sessionId } = await response.json();
       router.push(`/session/${sessionId}/approve`);
     } catch (err) {
@@ -140,287 +65,74 @@ export default function Home() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
-  const handleSelectSession = (sessionId: string, status: string) => {
-    if (status === "completed") {
-      router.push(`/session/${sessionId}/summary`);
-    } else if (status === "pending_approval") {
-      router.push(`/session/${sessionId}/approve`);
-    } else {
-      router.push(`/session/${sessionId}`);
-    }
-  };
-
-  const handleDemoMode = () => {
-    const params = new URLSearchParams({
-      prompt:
-        prompt.trim() ||
-        "Write a comprehensive research paper on Google Docs about the rise of Daedalus Labs...",
-      agents: String(agentCount),
-    });
-    router.push(`/session/demo?${params.toString()}`);
-  };
-
   return (
-    <div className="relative flex min-h-screen flex-col pb-16 lg:pb-0">
-      {/* Top bar */}
-      <header className="shrink-0 flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 border-b border-border/50">
-        <h1 className="text-lg font-bold tracking-tight text-foreground">
-          Televerse
-        </h1>
-
-        {authSession?.user && (
-          <div className="flex items-center gap-3">
-            {authSession.user.image ? (
-              <img
-                src={authSession.user.image}
-                alt=""
-                className="size-7 rounded-full"
-              />
-            ) : (
-              <div className="flex size-7 items-center justify-center rounded-full bg-primary/20 text-xs font-medium text-primary">
-                {authSession.user.name?.[0] ||
-                  authSession.user.email?.[0] ||
-                  "?"}
-              </div>
-            )}
-            <span className="hidden sm:inline text-sm text-muted-foreground">
-              {authSession.user.name || authSession.user.email}
-            </span>
-            <PlanBadge />
-            <Link href="/panopticon" className="hidden sm:inline-flex">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs">
-                Panopticon
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const firstActive = sessions.find((s) => s.status === "running" || s.status === "pending_approval");
-                setActiveSessionId(firstActive?.id ?? null);
-                setTeleportOpen(true);
-              }}
-              className="gap-1.5 text-amber-600 hover:text-amber-500 text-xs"
-            >
-              <Zap className="size-3.5" />
-              Teleport
+    <div className="flex min-h-screen flex-col bg-white">
+      <header className="border-b border-neutral-200">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+          <h1 className="text-lg font-bold text-neutral-900">Televerse</h1>
+          <Link href="/dev/mcp">
+            <Button variant="outline" size="sm" className="text-neutral-700">
+              Dev Tools
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => signOut()}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="size-4" />
-            </Button>
-          </div>
-        )}
+          </Link>
+        </div>
       </header>
 
-      {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Dashboard grid — full width on mobile, left side on desktop */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-6">
-          {sessionsLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="size-5 animate-spin text-zinc-600" />
-            </div>
-          ) : (
-            <DashboardGrid
-              sessions={sessions}
-              thumbnails={thumbnails}
-              onSelectSession={handleSelectSession}
-              onNewTask={() => setMobilePromptOpen(true)}
-            />
-          )}
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-12">
+        <h2 className="text-3xl font-bold text-neutral-900 sm:text-4xl">
+          Teleport an agent to fix a side problem
+        </h2>
+        <p className="mt-3 text-neutral-600">
+          One isolated sandbox spawns, investigates, and returns findings. Your main work continues.
+        </p>
+
+        <div className="mt-8 rounded-2xl border border-neutral-200 bg-white shadow-sm">
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Investigate why the checkout API is returning 500..."
+            className="min-h-[140px] resize-none border-0 bg-transparent px-5 pt-4 pb-3 text-base text-neutral-900 placeholder:text-neutral-500 focus-visible:ring-0"
+          />
+          <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3">
+            <span className="text-neutral-500">1 sandbox will be spawned</span>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !prompt.trim()}
+              className="gap-2 bg-neutral-900 text-white hover:bg-neutral-800"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Decomposing...
+                </>
+              ) : (
+                <>
+                  Teleport
+                  <ArrowRight className="size-4" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        {/* Right panel — prompt input (desktop only) */}
-        {isDesktop && (
-          <div className="w-[400px] shrink-0 border-l border-border/50 bg-card/30 p-6 overflow-y-auto">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <h2 className="text-sm font-semibold text-foreground">
-                  New Task
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Describe a complex task. AI agents will execute it on
-                  cloud desktops in parallel.
-                </p>
-              </div>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {EXAMPLE_PROMPTS.map((example) => (
+            <button
+              key={example.label}
+              onClick={() => setPrompt(example.prompt)}
+              className="rounded-full border border-neutral-300 bg-white px-4 py-1.5 text-sm text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50"
+            >
+              {example.label}
+            </button>
+          ))}
+        </div>
 
-              {/* Input area */}
-              <div className="rounded-xl border border-border bg-card backdrop-blur-sm overflow-hidden transition-colors focus-within:border-ring">
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Write a research paper on Google Docs about the rise of Daedalus Labs..."
-                  className="min-h-[128px] resize-none border-0 bg-transparent px-5 pt-4 pb-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0 leading-relaxed"
-                  disabled={isSubmitting}
-                />
-
-                <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground font-medium">
-                      Agents
-                    </span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4].map((n) => {
-                        const isLocked = n > maxAgents;
-                        return (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => {
-                              if (isLocked) {
-                                setAgentCount(4);
-                              } else {
-                                setAgentCount(n);
-                              }
-                            }}
-                            disabled={isSubmitting}
-                            title={
-                              isLocked
-                                ? "Upgrade to Pro to unlock"
-                                : undefined
-                            }
-                            className={`flex size-7 items-center justify-center rounded-md text-xs font-medium transition-all ${
-                              isLocked
-                                ? "text-muted-foreground cursor-not-allowed"
-                                : agentCount === n
-                                  ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                            }`}
-                          >
-                            {isLocked ? (
-                              <Lock className="size-3" />
-                            ) : (
-                              n
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDemoMode}
-                      disabled={isSubmitting}
-                      className="text-muted-foreground"
-                    >
-                      Demo
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={isSubmitting || !prompt.trim()}
-                      size="sm"
-                      className="gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="size-3.5 animate-spin" />
-                          Decomposing...
-                        </>
-                      ) : (
-                        "Launch"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Example prompts */}
-              <div className="flex flex-wrap gap-2">
-                {EXAMPLE_PROMPTS.map((example) => (
-                  <button
-                    key={example.label}
-                    onClick={() => setPrompt(example.prompt)}
-                    className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-ring hover:bg-accent transition-all"
-                  >
-                    {example.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Keyboard hint */}
-              <p className="text-xs text-muted-foreground">
-                <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {"\u2318"}
-                </kbd>
-                <span className="mx-1">+</span>
-                <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {"\u21B5"}
-                </kbd>
-                <span className="ml-1.5">to launch</span>
-              </p>
-
-              {/* Error */}
-              {error && (
-                <div className="animate-slide-in rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-            </div>
+        {error && (
+          <div className="mt-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
           </div>
         )}
-
-        {/* Teleports section (desktop) */}
-        {isDesktop && (
-          <div className="w-[400px] shrink-0 border-l border-border/50 bg-card/30 p-6 overflow-y-auto">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">
-                  Teleported Agents
-                </h2>
-                <button
-                  onClick={() => {
-                    const firstActive = sessions.find((s) => s.status === "running" || s.status === "pending_approval");
-                    setActiveSessionId(firstActive?.id ?? null);
-                    setTeleportOpen(true);
-                  }}
-                  className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-500"
-                >
-                  <Zap className="size-3" />
-                  New
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Side tasks delegated to isolated agents. Your session continues uninterrupted.
-              </p>
-              <TeleportList compact />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Mobile bottom nav */}
-      <MobileNav onNewTask={() => setMobilePromptOpen(true)} />
-
-      {/* Mobile prompt sheet */}
-      <MobilePromptSheet
-        open={mobilePromptOpen}
-        onOpenChange={setMobilePromptOpen}
-      />
-
-      {/* Teleport modal */}
-      {activeSessionId && (
-        <TeleportModal
-          open={teleportOpen}
-          onOpenChange={setTeleportOpen}
-          primarySessionId={activeSessionId}
-        />
-      )}
+      </main>
     </div>
   );
 }
