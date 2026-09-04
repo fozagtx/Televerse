@@ -5,10 +5,8 @@
  *     or the Model Context Tool Inspector extension). This is what a real
  *     ChatGPT / Codex integration will see.
  *
- *  2. A fallback dev registry on `window.__opticonWebMcp` that lets the
- *     /dev/mcp page list and invoke every registered tool from the browser
- *     console or a button — so we can verify behavior end-to-end even on
- *     browsers that haven't shipped the draft API yet.
+ *  2. A fallback registry on `window.__opticonWebMcp` for browsers that have
+ *     not shipped the draft API yet.
  *
  * The two are kept in lockstep by `setActive()` so we never end up with tools
  * registered on the dev side but not the real one (or vice versa).

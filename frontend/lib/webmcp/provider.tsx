@@ -31,9 +31,8 @@ export function WebMcpProvider({ children }: { children: React.ReactNode }) {
     async function mount() {
       if (status === "loading") return;
       if (status !== "authenticated" || !session?.user) {
-        // Anonymous users still get the dev registry so /dev/mcp works
-        // for the "tools list" view, but tools that hit the API will
-        // surface 401s when invoked — which is the correct behavior.
+        // Anonymous users still get the browser fallback registry; protected
+        // tool calls surface 401s when invoked.
         setCtx({ state: "loading", result: null, error: null });
         try {
           const result = await mountAllTools();

@@ -1,0 +1,19 @@
+# Televerse
+
+Televerse exposes WebMCP tools for AI agents that need isolated side-task execution.
+
+Machine-readable tool discovery:
+
+- GET /api/webmcp
+- Browser registration: document.modelContext
+- Browser fallback: window.__opticonWebMcp
+
+Available tools:
+
+- teleport_agent: create an isolated side-task agent
+- list_teleports: list side-task agents
+- get_teleport_status: read side-task progress
+- retrieve_teleport_result: retrieve a completed result
+- apply_teleport_patch: mark a reviewed patch for application
+- discard_teleport: discard a side task and workspace
+- cancel_teleport: cancel a running side task
