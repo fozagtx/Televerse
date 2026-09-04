@@ -27,9 +27,20 @@ export default function Home() {
           autoStart: true,
         }),
       });
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: { sessionId?: string; error?: string } = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(
+          responseText || `Server returned an invalid response (${response.status})`
+        );
+      }
       if (!response.ok) {
         throw new Error(data.error || "Failed to start sandbox");
+      }
+      if (!data.sessionId) {
+        throw new Error("Session was created without an id");
       }
       setActivePrompt(prompt.trim());
       setSessionId(data.sessionId);

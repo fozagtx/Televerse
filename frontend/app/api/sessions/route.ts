@@ -13,7 +13,13 @@ import { decomposeTasks, type DecomposedTask } from "@/lib/orchestrator";
 import { spawnWorkers } from "@/lib/worker-manager";
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON" }, { status: 400 });
+  }
+
   const { prompt, agentCount, autoStart = false } = body as {
     prompt: string;
     agentCount: number;
@@ -60,18 +66,17 @@ export async function POST(request: Request) {
     "decomposing"
   ).catch(console.error);
 
-  // Decompose prompt into TODOs via Dedalus
+  // A single agent can execute the original instruction directly. This keeps
+  // sandbox boot independent from the optional decomposition service.
   let todoDescriptions: DecomposedTask[];
   try {
-    todoDescriptions = await decomposeTasks(prompt.trim(), agentCount);
+    todoDescriptions =
+      agentCount === 1
+        ? [{ description: prompt.trim(), lane: 0 }]
+        : await decomposeTasks(prompt.trim(), agentCount);
   } catch (error) {
-    console.error("[orchestrator] Failed to decompose prompt:", error);
-    const failedSession = getSession(sessionId);
-    if (failedSession) failedSession.status = "failed";
-    return NextResponse.json(
-      { error: "Failed to decompose prompt" },
-      { status: 500 },
-    );
+    console.error("[orchestrator] Failed to decompose prompt; using direct task:", error);
+    todoDescriptions = [{ description: prompt.trim(), lane: 0 }];
   }
 
   // Add TODOs to session — do NOT start workers yet
@@ -82,6 +87,11 @@ export async function POST(request: Request) {
 
   const opticonSession = getSession(sessionId);
   if (autoStart) {
+    if (!opticonSession) {
+      return NextResponse.json({ error: "Session was not created" }, { status: 500 });
+    }
+    // Keep the existing state machine contract, then start workers immediately.
+    opticonSession.status = "pending_approval";
     approveSession(sessionId);
     persistSessionStatus(sessionId, "running").catch(console.error);
     spawnWorkers(sessionId, agentCount);

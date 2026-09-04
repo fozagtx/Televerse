@@ -327,6 +327,29 @@ app.prepare().then(() => {
           console.error(`[server] Failed to recover session ${sessionId} from DB:`, err);
         }
       }
+
+      // A worker may have booted before the browser joined the room. Replay
+      // the current state so the browser can still attach to the live VNC.
+      const current = getSession(sessionId);
+      if (current) {
+        for (const agent of current.agents) {
+          socket.emit("agent:join", { agentId: agent.id, sessionId });
+          if (agent.streamUrl) {
+            socket.emit("agent:stream_ready", {
+              agentId: agent.id,
+              sessionId,
+              streamUrl: agent.streamUrl,
+            });
+          }
+          if (agent.status === "error" && agent.errorMessage) {
+            socket.emit("agent:error", {
+              agentId: agent.id,
+              sessionId,
+              error: agent.errorMessage,
+            });
+          }
+        }
+      }
     });
 
     socket.on("session:leave", (sessionId) => {
