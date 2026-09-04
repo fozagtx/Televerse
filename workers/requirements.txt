@@ -1,4 +1,4 @@
-e2b-desktop
+e2b
 openai
 Pillow
 imageio

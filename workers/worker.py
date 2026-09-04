@@ -8,7 +8,7 @@ import time
 from io import BytesIO
 
 import socketio
-from e2b_desktop import Sandbox
+from e2b import Sandbox
 from openai import AsyncOpenAI
 from PIL import Image
 
@@ -243,19 +243,24 @@ async def main():
 
     # --- Socket.io connection with retry ---
     sio = socketio.AsyncClient()
-    max_connect_retries = 10
+    socket_urls = [socket_url, "http://127.0.0.1:3000", "http://localhost:3000"]
+    socket_urls = list(dict.fromkeys(socket_urls))
     connected = False
-    for attempt in range(max_connect_retries):
-        try:
-            await sio.connect(socket_url)
-            connected = True
+    for url in socket_urls:
+        for attempt in range(5):
+            try:
+                logger.info("Connecting to socket at %s (attempt %d)", url, attempt + 1)
+                await sio.connect(url)
+                connected = True
+                break
+            except socketio.exceptions.ConnectionError as e:
+                logger.warning("Socket connect %s attempt %d failed: %s", url, attempt + 1, e)
+                if attempt < 4:
+                    await asyncio.sleep(2)
+        if connected:
             break
-        except socketio.exceptions.ConnectionError as e:
-            logger.warning("Socket connect attempt %d/%d failed: %s", attempt + 1, max_connect_retries, e)
-            if attempt < max_connect_retries - 1:
-                await asyncio.sleep(2)
     if not connected:
-        logger.error("Failed to connect to socket server at %s after %d attempts", socket_url, max_connect_retries)
+        logger.error("Failed to connect to socket server after all attempts")
         return
 
     async def emit(event, data):

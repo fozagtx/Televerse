@@ -82,7 +82,7 @@ export default function Home() {
         <h2 className="text-3xl font-bold text-neutral-900 sm:text-4xl">
           Teleport an agent to fix a side problem
         </h2>
-        <p className="mt-3 text-neutral-600">
+        <p className="mt-3 text-neutral-700">
           One isolated sandbox spawns, investigates, and returns findings. Your main work continues.
         </p>
 
