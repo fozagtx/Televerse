@@ -105,12 +105,14 @@ function AgentGridCell({
         </div>
 
         {/* Stream or mock screen */}
-        {!isMock && agent.streamUrl ? (
+        {!isMock ? (
           <VMTab
             agentId={agent.id}
             sessionId={sessionId || ""}
             streamUrl={agent.streamUrl}
             isActive={true}
+            status={agent.status}
+            errorMessage={agent.errorMessage}
           />
         ) : (
           <AgentScreen

@@ -35,14 +35,13 @@ function markWorkerFailed(
   if (code === 0 || (code === null && signal)) return;
 
   const detail = outputLines.length > 0 ? `: ${outputLines.join("\n")}` : "";
-  const error = `Worker exited before the desktop stream became available${code !== null ? ` (code ${code})` : ""}${detail}`;
-
-  updateAgentStatus(sessionId, agentId, "error");
+  const errorMessage = `Worker exited before the desktop stream became available${code !== null ? ` (code ${code})` : ""}${detail}`;
 
   try {
+    updateAgentStatus(sessionId, agentId, "error", errorMessage);
     getIO().to(`session:${sessionId}`).emit("agent:error", {
       agentId,
-      error,
+      error: errorMessage,
     });
   } catch (err) {
     console.error("[worker-manager] Failed to broadcast worker error:", err);
@@ -50,12 +49,13 @@ function markWorkerFailed(
 }
 
 function markWorkerSpawnFailed(sessionId: string, agentId: string, err: Error): void {
-  updateAgentStatus(sessionId, agentId, "error");
+  const errorMessage = `Worker process failed to start: ${err.message}`;
+  updateAgentStatus(sessionId, agentId, "error", errorMessage);
 
   try {
     getIO().to(`session:${sessionId}`).emit("agent:error", {
       agentId,
-      error: `Worker process failed to start: ${err.message}`,
+      error: errorMessage,
     });
   } catch (broadcastErr) {
     console.error("[worker-manager] Failed to broadcast worker spawn error:", broadcastErr);

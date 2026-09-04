@@ -192,13 +192,18 @@ export function addAgent(sessionId: string, agent: Agent): void {
 export function updateAgentStatus(
   sessionId: string,
   agentId: string,
-  status: Agent["status"]
+  status: Agent["status"],
+  errorMessage?: string,
 ): void {
   const session = sessions.get(sessionId);
   if (!session) return;
 
   const agent = session.agents.find((a) => a.id === agentId);
-  if (agent) agent.status = status;
+  if (agent) {
+    agent.status = status;
+    if (errorMessage) agent.errorMessage = errorMessage;
+    else if (status !== "error") agent.errorMessage = undefined;
+  }
   persistAgentStatus(agentId, status).catch(console.error);
 }
 

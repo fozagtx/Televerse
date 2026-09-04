@@ -589,7 +589,6 @@ export function SessionWorkspace({
               agentActivities={MOCK_AGENT_ACTIVITIES}
               sessionId={sessionId}
               whiteboard={whiteboard}
-              onAgentCommand={handleAgentCommand}
               replays={replays}
               compact={isMobile}
             />

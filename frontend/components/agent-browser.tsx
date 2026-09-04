@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Agent } from "@/lib/types";
 import { AgentActivity } from "@/lib/mock-data";
 import { AgentScreen } from "./agent-screen";
@@ -10,10 +9,8 @@ import {
   ReplayFrameOverlay,
   ReplayScrubberBar,
 } from "./replay-scrubber";
-import { Send, Ellipsis, X } from "lucide-react";
+import { Ellipsis, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 interface AgentBrowserProps {
   agents: Agent[];
@@ -22,7 +19,6 @@ interface AgentBrowserProps {
   agentActivities: Record<string, AgentActivity>;
   sessionId?: string;
   whiteboard?: string;
-  onAgentCommand?: (agentId: string, message: string) => void;
   replays?: Record<string, { manifestUrl: string; frameCount: number }>;
   compact?: boolean;
 }
@@ -34,23 +30,14 @@ export function AgentBrowser({
   agentActivities,
   sessionId,
   whiteboard,
-  onAgentCommand,
   replays,
   compact = false,
 }: AgentBrowserProps) {
   const isMock = sessionId === "demo";
   const isWhiteboardTab = activeAgentId === "__whiteboard__";
-  const [chatInput, setChatInput] = useState("");
 
   const activeReplay = replays?.[activeAgentId];
   const hasReplay = !!activeReplay && !isWhiteboardTab;
-
-  const handleSendCommand = () => {
-    const trimmed = chatInput.trim();
-    if (!trimmed) return;
-    onAgentCommand?.(activeAgentId, trimmed);
-    setChatInput("");
-  };
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-border bg-muted/30 overflow-hidden shadow-xl shadow-black/20">
@@ -139,7 +126,7 @@ export function AgentBrowser({
               const isActive = agent.id === activeAgentId && !isWhiteboardTab;
               const agentActivity = agentActivities[agent.id];
 
-              if (isMock || !agent.streamUrl) {
+              if (isMock) {
                 return isActive ? (
                   <div key={agent.id} className="absolute inset-0 z-10">
                     <AgentScreen
@@ -159,6 +146,8 @@ export function AgentBrowser({
                   sessionId={sessionId || ""}
                   streamUrl={agent.streamUrl}
                   isActive={isActive}
+                  status={agent.status}
+                  errorMessage={agent.errorMessage}
                 />
               );
             })}
@@ -200,7 +189,7 @@ function ReplayEnabledView({
           const isActive = agent.id === activeAgentId;
           const agentActivity = agentActivities[agent.id];
 
-          if (isMock || !agent.streamUrl) {
+          if (isMock) {
             return isActive ? (
               <div key={agent.id} className="absolute inset-0 z-10">
                 <AgentScreen
@@ -220,6 +209,8 @@ function ReplayEnabledView({
               sessionId={sessionId || ""}
               streamUrl={agent.streamUrl}
               isActive={isActive}
+              status={agent.status}
+              errorMessage={agent.errorMessage}
             />
           );
         })}
