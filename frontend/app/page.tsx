@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Play, RotateCcw } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CloudIcon } from "@hugeicons/core-free-icons";
 import { SessionWorkspace } from "./session/[id]/page";
 
 export default function Home() {
@@ -137,6 +139,12 @@ export default function Home() {
           ) : (
             <div className="flex h-full min-h-[520px] items-center justify-center px-4 py-10 text-center">
               <div className="max-w-md space-y-3">
+                <HugeiconsIcon
+                  icon={CloudIcon}
+                  size={42}
+                  strokeWidth={1.5}
+                  className="mx-auto text-foreground"
+                />
                 <h2 className="text-2xl font-bold text-foreground">
                   Sandbox ready area
                 </h2>
