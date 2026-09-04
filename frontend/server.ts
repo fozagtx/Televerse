@@ -54,14 +54,12 @@ import {
   createSlackApp,
   getSlackApp,
   postMilestoneToSlack,
-  postCompletionToSlack,
   postErrorToSlack,
   postCheckpointToSlack,
 } from "./lib/slack/app";
 import { summarizeActions, type BufferedAction } from "./lib/slack/summarize-actions";
 import {
   getSlackSessionBySessionId,
-  completeSlackSession,
 } from "./lib/slack/session-adapter";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -213,8 +211,7 @@ app.prepare().then(() => {
 
       // Send task to the specific worker socket
       const whiteboard = getWhiteboard(sessionId);
-      const room = `session:${sessionId}`;
-      io.to(room).emit("task:assign", {
+      io.to(`agent:${agent.id}`).emit("task:assign", {
         taskId: nextTask.id,
         description: nextTask.description,
         whiteboard,
@@ -377,6 +374,7 @@ app.prepare().then(() => {
     socket.on("agent:join", (data: AgentJoinEvent) => {
       const { sessionId, agentId } = data;
       socket.join(`session:${sessionId}`);
+      socket.join(`agent:${agentId}`);
       console.log(`[socket.io] Worker ${agentId} joined session:${sessionId}`);
 
       // Forward to browser clients
@@ -636,42 +634,11 @@ app.prepare().then(() => {
           whiteboard,
         });
       } else if (isSessionFullyComplete(sessionId)) {
-        // All tasks done — close the worker after replay data is saved.
+        // Keep the worker alive and idle so the user can send a follow-up.
+        // The explicit Finish or Stop action owns session shutdown.
         const room = `session:${sessionId}`;
         io.to(room).emit("session:tasks_done", { sessionId });
-        console.log(
-          `[server] Session ${sessionId} — all tasks completed, shutting down agents`
-        );
-
-        stoppingSessions.add(sessionId);
-        io.to(room).emit("session:stop", { sessionId });
-        io.to(room).emit("task:none");
-
-        // Post completion to Slack immediately while workers save their replays.
-        const slackSession = getSlackSessionBySessionId(sessionId);
-        if (slackSession) {
-          const whiteboard = getWhiteboard(sessionId);
-          const todoCount = getSession(sessionId)?.todos.length ?? 0;
-          postCompletionToSlack({
-            sessionId,
-            threadTs: slackSession.threadTs,
-            channelId: slackSession.channelId,
-            summary: whiteboard || `Completed ${todoCount} task(s).`,
-          }).catch(console.error);
-          completeSlackSession(slackSession.threadTs, slackSession.channelId).catch(
-            console.error
-          );
-
-        }
-
-        const timeout = setTimeout(() => {
-          stopTimers.delete(sessionId);
-          if (stoppingSessions.has(sessionId)) {
-            console.log(`[server] Session ${sessionId} — completion shutdown timed out`);
-            completeStoppedSession(sessionId);
-          }
-        }, STOP_TIMEOUT_MS);
-        stopTimers.set(sessionId, timeout);
+        console.log(`[server] Session ${sessionId} — all tasks completed, workers idle for follow-ups`);
       }
       // Otherwise: no pending tasks but session not complete — agent idles
     });

@@ -121,7 +121,6 @@ function TypewriterText({
       }
     }, speed);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animate, text, words.length, speed]);
 
   if (!animate || hasAnimated.current || wordCount >= words.length)
@@ -196,7 +195,6 @@ const ToolChip = memo(function ToolChip({
 export function ThinkingSidebar({
   entries,
   agents,
-  activeAgentId,
 }: ThinkingSidebarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(
@@ -253,12 +251,16 @@ export function ThinkingSidebar({
   // Auto-scroll + unseen count tracking
   useEffect(() => {
     if (isNearBottom && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
       lastSeenCount.current = displayEntries.length;
-      setUnseenCount(0);
     } else if (displayEntries.length > prevEntryCount.current) {
       const newUnseen = displayEntries.length - lastSeenCount.current;
-      if (newUnseen > 0) setUnseenCount(newUnseen);
+      if (newUnseen > 0) {
+        window.setTimeout(() => setUnseenCount(newUnseen), 0);
+      }
     }
     prevEntryCount.current = displayEntries.length;
   }, [displayEntries.length, isNearBottom]);
@@ -377,9 +379,7 @@ export function ThinkingSidebar({
               const showHeader = !isSameAgent;
               const threadId = threadMap.get(entry.id) || entry.id;
               const isThreadExpanded = expandedThreads.has(threadId);
-              const shouldAnimate =
-                !!entry.reasoning &&
-                !animatedEntries.current.has(entry.id);
+              const shouldAnimate = !!entry.reasoning;
               const bodyText = entry.reasoning || entry.action;
               const agentIdx = getAgentIndex(entry.agentId, agents);
               const agentColor = getAgentColor(agentIdx);

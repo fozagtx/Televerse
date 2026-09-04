@@ -103,7 +103,10 @@ export function ThinkingBottomSheet({
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isExpanded && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
   }, [displayEntries.length, isExpanded]);
 
