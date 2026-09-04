@@ -6,25 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Play, RotateCcw } from "lucide-react";
 import { SessionWorkspace } from "./session/[id]/page";
 
-const EXAMPLE_PROMPTS = [
-  {
-    label: "Debug Payment 500",
-    prompt:
-      "Clone the checkout repo, open the app in the browser, reproduce the payment 500 error. Inspect the network tab and payment handler code. Find the root cause and return a patch.",
-  },
-  {
-    label: "Browser QA Testing",
-    prompt:
-      "Clone the repo, open it in the browser, and run the QA checks. Look for console errors, broken layout, and form validation issues. Report every failure.",
-  },
-  {
-    label: "Install OpenClaw",
-    prompt:
-      "Open a terminal, install OpenClaw with curl -fsSL https://openclaw.ai/install.sh | bash, verify the version, and report back.",
-  },
-];
-
-
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [activePrompt, setActivePrompt] = useState("");
@@ -85,7 +66,7 @@ export default function Home() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Tell the agent what to do in the web app, fields, browser, or sandbox..."
-                className="h-[220px] min-h-[180px] resize-none text-sm lg:h-full"
+                className="h-36 min-h-[140px] resize-none text-sm sm:h-40"
                 onKeyDown={(e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                     e.preventDefault();
@@ -98,25 +79,6 @@ export default function Home() {
             {error && (
               <div className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground">
                 {error}
-              </div>
-            )}
-
-            {!sessionId && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Examples
-                </p>
-                <div className="flex flex-wrap gap-2 lg:flex-col">
-                  {EXAMPLE_PROMPTS.map((example) => (
-                    <button
-                      key={example.label}
-                      onClick={() => setPrompt(example.prompt)}
-                      className="rounded-md border border-border bg-background px-3 py-2 text-left text-xs text-foreground hover:bg-accent"
-                    >
-                      {example.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
