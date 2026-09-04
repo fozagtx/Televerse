@@ -1,39 +1,41 @@
 import base64
 import time
-from daytona import ScreenshotOptions
 
 _sandbox = None
 
 
 def init(sandbox):
-    """Set the Daytona sandbox instance used by all tool functions."""
+    """Set the E2B sandbox instance used by all tool functions."""
     global _sandbox
     _sandbox = sandbox
 
 
 def screenshot_raw_bytes() -> bytes:
     """Take a screenshot and return raw PNG bytes."""
-    resp = _sandbox.computer_use.screenshot.take_full_screen()
-    b64 = resp.base64
-    return base64.b64decode(b64)
+    return _sandbox.screenshot()
 
 
 def screenshot_as_base64() -> str:
     """Take a screenshot and return base64-encoded PNG."""
-    resp = _sandbox.computer_use.screenshot.take_full_screen()
-    return resp.base64
+    img_bytes = screenshot_raw_bytes()
+    return base64.b64encode(img_bytes).decode("utf-8")
 
 
 def click(x: int, y: int, button: str = "left", **_kwargs) -> str:
     """Click at screen coordinates (x, y)."""
-    _sandbox.computer_use.mouse.click(x, y, button)
+    if button == "right":
+        _sandbox.right_click(x, y)
+    elif button == "middle":
+        _sandbox.middle_click(x, y)
+    else:
+        _sandbox.left_click(x, y)
     time.sleep(0.1)
     return f"Clicked ({button}) at ({x}, {y})"
 
 
 def double_click(x: int, y: int, **_kwargs) -> str:
     """Double-click at screen coordinates (x, y)."""
-    _sandbox.computer_use.mouse.click(x, y, "left", True)
+    _sandbox.double_click(x, y)
     return f"Double-clicked at ({x}, {y})"
 
 
@@ -42,10 +44,10 @@ def type_text(text: str) -> str:
     parts = text.split("\n")
     for i, part in enumerate(parts):
         if part:
-            _sandbox.computer_use.keyboard.type(part)
+            _sandbox.write(part)
             time.sleep(0.05)
         if i < len(parts) - 1:
-            _sandbox.computer_use.keyboard.press("enter")
+            _sandbox.press("Enter")
             time.sleep(0.05)
     return f"Typed: {text}"
 
@@ -62,32 +64,33 @@ _KEY_ALIASES = {
 }
 
 
-def _normalize_key(key: str) -> str:
-    """Normalize key names."""
-    return _KEY_ALIASES.get(key.strip().lower(), key.strip().lower())
+def _normalize_key(key: str) -> str | list[str]:
+    """Normalize key names and split combos like 'ctrl+c' into lists."""
+    key = key.strip()
+    if "+" in key:
+        parts = [_KEY_ALIASES.get(k.lower(), k.lower()) for k in key.split("+")]
+        return parts
+    return _KEY_ALIASES.get(key.lower(), key.lower())
 
 
 def press_key(key: str, **_kwargs) -> str:
     """Press a key or key combo (e.g. 'enter', 'ctrl+c')."""
     time.sleep(0.1)
     normalized = _normalize_key(key)
-    if "+" in normalized:
-        _sandbox.computer_use.keyboard.hotkey(normalized)
-    else:
-        _sandbox.computer_use.keyboard.press(normalized)
+    _sandbox.press(normalized)
     return f"Pressed: {normalized}"
 
 
 def move_mouse(x: int, y: int) -> str:
     """Move the mouse cursor to screen coordinates (x, y) without clicking."""
-    _sandbox.computer_use.mouse.move(x, y)
+    _sandbox.move_mouse(x, y)
     return f"Moved mouse to ({x}, {y})"
 
 
 def scroll(x: int, y: int, direction: str = "down", amount: int = 3) -> str:
     """Scroll at screen coordinates (x, y) in the given direction."""
-    _sandbox.computer_use.mouse.move(x, y)
-    _sandbox.computer_use.mouse.scroll(x, y, direction, amount)
+    _sandbox.move_mouse(x, y)
+    _sandbox.scroll(direction=direction, amount=amount)
     return f"Scrolled {direction} by {amount} at ({x}, {y})"
 
 

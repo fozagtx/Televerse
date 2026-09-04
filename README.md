@@ -8,7 +8,7 @@ Agent Teleportation for Codex. Teleport isolated agents into cloud desktops to i
 2. **A side problem appears** — a bug, test failure, unclear error, browser issue
 3. **Teleport an agent** via the UI (`⚡ Teleport` button) or WebMCP (`teleport_agent` tool)
 4. **Televerse captures context** from the session: prompt, recent todos, whiteboard, errors, relevant files
-5. **A fresh agent spawns** in an isolated Daytona sandbox with its own browser and terminal
+5. **A fresh agent spawns** in an isolated E2B sandbox with its own browser and terminal
 6. **The teleported agent investigates** — reproduces the issue, inspects logs, runs tests, collects evidence
 7. **Results become reviewable** — the user or agent reviews the structured findings, root cause, evidence, and optional patch
 8. **Apply or discard** — the patch can be reviewed, applied, or discarded via the UI or WebMCP
@@ -27,7 +27,7 @@ Televerse Web App (Next.js 16 + Socket.io)
       └─── Socket.io (real-time streaming)
               │
               ▼
-        Daytona Sandbox
+        E2B Sandbox
         (isolated cloud Linux desktop)
               │
               ├── Browser
@@ -38,7 +38,7 @@ Televerse Web App (Next.js 16 + Socket.io)
 - **Frontend**: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui
 - **Real-time**: Socket.io (browser ↔ backend ↔ workers)
 - **WebMCP**: 7 tools registered via `document.modelContext.registerTool()`
-- **Sandboxes**: Daytona cloud desktops with VNC streaming
+- **Sandboxes**: E2B cloud desktops with noVNC streaming
 - **Database**: Optional (in-memory by default, Render Postgres or Neon supported)
 
 ## Project Structure
@@ -58,7 +58,7 @@ Televerse Web App (Next.js 16 + Socket.io)
   server.ts             Custom HTTP server with Socket.io
 /workers
   worker.py             Python agent worker
-  daytona_tools.py      Daytona sandbox tool wrappers
+  e2b_tools.py          E2B sandbox tool wrappers
   replay.py             Session replay recording
   /tools                Additional tool modules
 ```
@@ -83,7 +83,7 @@ Televerse exposes 7 tools via `document.modelContext` for AI agents (Codex, Chat
 
 - Node.js 18+
 - Python 3.10+ (only needed for autonomous agent workers)
-- Daytona API key (get one at https://app.daytona.io/dashboard/keys)
+- E2B API key (get one at https://e2b.dev/docs)
 
 ### Install Dependencies
 
@@ -101,8 +101,7 @@ pip install -r workers/requirements.txt
 Create `frontend/.env.local`:
 
 ```env
-DAYTONA_API_KEY=         # Daytona sandbox provisioning (required)
-DAYTONA_TARGET=us        # Daytona target region
+E2B_API_KEY=             # E2B sandbox provisioning
 ```
 
 ### Run
@@ -132,9 +131,9 @@ npx vitest run lib/teleport/__tests__/store.test.ts
 ## Key Design Decisions
 
 - **WebMCP is the agent interface** — Codex/ChatGPT discovers tools via `document.modelContext`. No backend MCP server needed.
-- **No LLM key required** — The WebMCP path is pure REST. You only need `DAYTONA_API_KEY` for sandbox provisioning.
+- **No LLM key required** — The WebMCP path is pure REST. You only need `E2B_API_KEY` for sandbox provisioning.
 - **Context capture is compact** — The teleported agent receives a focused context packet (prompt, recent todos, errors, whiteboard), not the full conversation.
-- **Isolation is real** — Every teleport gets its own Daytona sandbox, Socket.io room, and whiteboard. The original session is never touched.
+- **Isolation is real** — Every teleport gets its own E2B sandbox, Socket.io room, and whiteboard. The original session is never touched.
 
 ## Deploy
 
