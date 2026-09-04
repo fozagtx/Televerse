@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Play, RotateCcw } from "lucide-react";
@@ -64,7 +65,17 @@ export default function Home() {
       <main className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="flex min-h-[360px] flex-col border-b border-border bg-card lg:h-screen lg:border-b-0 lg:border-r">
           <div className="border-b border-border px-4 py-4 sm:px-5">
-            <h1 className="text-lg font-bold text-foreground">Televerse</h1>
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/icon.svg"
+                alt=""
+                aria-hidden="true"
+                width={32}
+                height={32}
+                className="size-8 rounded-lg"
+              />
+              <h1 className="text-lg font-bold text-foreground">Televerse</h1>
+            </div>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               One prompt starts one sandbox. The live browser, VNC, and action log stay on this screen.
             </p>
